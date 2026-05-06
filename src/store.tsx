@@ -3,8 +3,12 @@ import { Routine, INITIAL_ROUTINES, Goal, ExerciseLog, INITIAL_LOGS, CompletedWo
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from './lib/supabase';
 import { toast } from 'sonner';
+import { User } from '@supabase/supabase-js';
 
 interface AppState {
+  user: User | null;
+  isLoadingAuth: boolean;
+  signOut: () => Promise<void>;
   routines: Routine[];
   completedExercises: string[];
   goals: Goal[];
@@ -29,11 +33,14 @@ interface AppState {
 const AppContext = createContext<AppState | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [routines, setRoutines] = useState<Routine[]>(INITIAL_ROUTINES);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  
+  const [routines, setRoutines] = useState<Routine[]>([]);
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
   const [goals, setGoalsState] = useState<Goal[]>([]);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
-  const [exerciseLogs, setExerciseLogs] = useState<ExerciseLog[]>(INITIAL_LOGS);
+  const [exerciseLogs, setExerciseLogs] = useState<ExerciseLog[]>([]);
   const [completedWorkouts, setCompletedWorkouts] = useState<CompletedWorkout[]>([]);
 
   const [isTrainingGlobal, setIsTrainingGlobal] = useState(false);
@@ -55,26 +62,55 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    const db = supabase();
+    if (!db) {
+      setIsLoadingAuth(false);
+      // Fallback for no Supabase config
+      setRoutines(INITIAL_ROUTINES);
+      setExerciseLogs(INITIAL_LOGS);
+      return;
+    }
+
+    // Check active sessions and sets the user
+    db.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setIsLoadingAuth(false);
+    });
+
+    // Listen for changes on auth state (sign in, sign out, etc.)
+    const { data: { subscription } } = db.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setIsLoadingAuth(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
     const fetchSupabaseData = async () => {
       const db = supabase();
-      if (!db) return; // Utiliza mock data si no hay credenciales
+      if (!db || !user) {
+        if (!db) {
+           // mock data solo si no hay supabase, si no está logeado que espere el login
+           setRoutines(INITIAL_ROUTINES);
+        }
+        return;
+      }
 
       try {
         // Fetch Rutinas
         const { data: dbRoutines, error: routinesError } = await db.from('routines').select('*');
         if (routinesError) {
           console.error("Supabase Error fetch rutinas:", routinesError);
-        } else if (dbRoutines) {
-          // Si la base está totalmente vacía pero tenemos rutinas por defecto locales,
-          // opcionalmente podrías insertarlas en supabase. Por ahora, las reemplazamos (empezará vacío)
-          if (dbRoutines.length > 0) {
-            setRoutines(dbRoutines.map((r: any) => ({
-              id: r.id,
-              name: r.name,
-              assignedDay: r.assigned_day !== undefined ? r.assigned_day : r.assignedDay,
-              exercises: r.exercises
-            })));
-          }
+        } else if (dbRoutines && dbRoutines.length > 0) {
+          setRoutines(dbRoutines.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            assignedDay: r.assigned_day !== undefined ? r.assigned_day : r.assignedDay,
+            exercises: r.exercises
+          })));
+        } else {
+          setRoutines([]);
         }
 
         // Fetch logs
@@ -89,6 +125,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
             type: l.type,
             exerciseName: l.exercise_name !== undefined ? l.exercise_name : l.exerciseName
           })));
+        } else {
+          setExerciseLogs([]);
         }
 
         // Fetch goals
@@ -96,7 +134,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (goalsError) console.error("Supabase Error fetch goals:", goalsError);
         else if (dbGoals && dbGoals.length > 0) {
           setGoalsState(dbGoals);
-          setHasCompletedOnboarding(true); // Si ya hay metas, saltamos onboarding
+          setHasCompletedOnboarding(true);
+        } else {
+          setGoalsState([]);
+          setHasCompletedOnboarding(false);
         }
 
         // Fetch completed workouts
@@ -109,14 +150,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
             routineName: w.routine_name,
             date: w.date
           })));
+        } else {
+          setCompletedWorkouts([]);
         }
 
       } catch (err) {
         console.error("Error al cargar data de Supabase:", err);
       }
     };
+
     fetchSupabaseData();
-  }, []);
+  }, [user]);
+
+  const signOut = async () => {
+    const db = supabase();
+    if (db) {
+      await db.auth.signOut();
+      setUser(null);
+      setRoutines([]);
+      setGoalsState([]);
+      setExerciseLogs([]);
+      setCompletedWorkouts([]);
+      setHasCompletedOnboarding(false);
+    }
+  };
 
   const addRoutine = async (routine: Omit<Routine, 'id'>) => {
     const newRoutine = { ...routine, id: uuidv4() };
@@ -130,15 +187,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         assigned_day: newRoutine.assignedDay,
         exercises: newRoutine.exercises
       };
-      const { data, error } = await db.from('routines').insert([payload]).select();
+      const { error } = await db.from('routines').insert([payload]);
       if (error) {
         console.error("Supabase Error Insertando Rutina:", error);
         toast.error(`Error guardando rutina: ${error.message}`);
       } else {
         toast.success("Rutina creada correctamente");
       }
-    } else {
-      toast.success("Rutina creada localmente");
     }
   };
 
@@ -159,8 +214,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else {
         toast.success("Rutina actualizada");
       }
-    } else {
-      toast.success("Rutina actualizada localmente");
     }
   };
 
@@ -176,8 +229,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else {
         toast.success("Eliminado correctamente");
       }
-    } else {
-      toast.success("Eliminado correctamente localmente");
     }
   };
 
@@ -220,7 +271,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const newWorkout = { ...workout, id: uuidv4() };
     setCompletedWorkouts(prev => [...prev, newWorkout]);
     
-    // Reset completed exercises for next time
     setCompletedExercises([]);
 
     const db = supabase();
@@ -238,6 +288,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{ 
+      user,
+      isLoadingAuth,
+      signOut,
       routines, 
       completedExercises, 
       goals, 

@@ -1,18 +1,33 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { useAppContext } from '../store';
-import { Medal, Flame, Trophy } from 'lucide-react';
+import { Medal, Flame, Trophy, LogOut } from 'lucide-react';
 
 export function ProfileScreen() {
-  const { completedWorkouts } = useAppContext();
+  const { user, completedWorkouts, signOut } = useAppContext();
 
   return (
     <div className="flex-1 overflow-y-auto hide-scrollbar p-6">
       <div className="flex justify-between items-center mb-8 pt-4">
-        <div>
-          <p className="text-gray-400 font-medium text-sm">Tu Perfil</p>
-          <h1 className="text-white font-display font-bold text-3xl">Logros</h1>
+        <div className="flex items-center gap-4">
+          {user?.user_metadata?.avatar_url ? (
+            <img src={user.user_metadata.avatar_url} alt="Profile" className="w-12 h-12 rounded-full border-2 border-gym-lime" />
+          ) : (
+            <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center font-bold text-white">
+              {user?.email?.charAt(0).toUpperCase() || 'U'}
+            </div>
+          )}
+          <div>
+            <p className="text-gray-400 font-medium text-xs truncate max-w-[150px]">{user?.email}</p>
+            <h1 className="text-white font-display font-bold text-2xl">{user?.user_metadata?.full_name || 'Tu Perfil'}</h1>
+          </div>
         </div>
+        <button 
+          onClick={signOut}
+          className="w-10 h-10 flex items-center justify-center bg-[#1C1C24] text-red-400 rounded-full border border-red-500/20 active:bg-red-500/10 transition-colors"
+        >
+          <LogOut size={20} />
+        </button>
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-8">

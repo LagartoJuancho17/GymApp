@@ -5,6 +5,7 @@ import { RoutinesScreen } from './RoutinesScreen';
 import { StatsScreen } from './StatsScreen';
 import { ProfileScreen } from './ProfileScreen';
 import { OnboardingScreen } from './OnboardingScreen';
+import { LoginScreen } from './LoginScreen';
 import { AppProvider, useAppContext } from '../store';
 import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
@@ -15,7 +16,20 @@ export type ScreenType = 'home' | 'routines' | 'stats' | 'profile';
 
 function AppContent() {
   const [activeScreen, setActiveScreen] = useState<ScreenType>('home');
-  const { hasCompletedOnboarding } = useAppContext();
+  const { user, isLoadingAuth, hasCompletedOnboarding } = useAppContext();
+
+  if (isLoadingAuth) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center bg-gym-dark text-white">
+        <div className="w-10 h-10 border-4 border-gym-lime border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-gray-400">Conectando...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen />;
+  }
 
   if (!hasCompletedOnboarding) {
     return <OnboardingScreen />;
