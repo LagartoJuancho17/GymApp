@@ -117,7 +117,7 @@ function AppContent() {
 export function AppLayout() {
   return (
     <AppProvider>
-      <div className="w-full max-w-[414px] h-[100vh] bg-gym-dark relative flex flex-col shadow-2xl overflow-hidden mx-auto sm:border-x sm:border-neutral-900">
+      <div className="w-full max-w-[414px] h-[100dvh] bg-gym-dark relative flex flex-col shadow-2xl overflow-hidden mx-auto sm:border-x sm:border-neutral-900">
         <AppContent />
       </div>
     </AppProvider>
