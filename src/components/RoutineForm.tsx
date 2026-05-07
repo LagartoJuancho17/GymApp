@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ChevronLeft, Plus, Trash2, Save } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { ChevronLeft, Plus, Save, Youtube, Trash2 } from 'lucide-react';
 import { Routine, Exercise, ExerciseType } from '../types';
 import { useAppContext } from '../store';
 import { v4 as uuidv4 } from 'uuid';
@@ -58,6 +58,33 @@ export function RoutineForm({ routine, onClose }: RoutineFormProps) {
     onClose();
   };
 
+  const [pressingId, setPressingId] = useState<string | null>(null);
+  const [exerciseToDelete, setExerciseToDelete] = useState<string | null>(null);
+  const [videoPromptId, setVideoPromptId] = useState<string | null>(null);
+  const [videoUrlInput, setVideoUrlInput] = useState<string>('');
+  const pressTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const handlePressStart = (id: string, e: React.MouseEvent | React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName.toLowerCase() === 'input' || target.tagName.toLowerCase() === 'select' || target.tagName.toLowerCase() === 'button' || target.closest('button')) {
+      return;
+    }
+    setPressingId(id);
+    pressTimer.current = setTimeout(() => {
+      setPressingId(null);
+      setExerciseToDelete(id);
+      if (navigator.vibrate) navigator.vibrate([100]);
+    }, 2000);
+  };
+
+  const handlePressEnd = () => {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+    setPressingId(null);
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -111,7 +138,7 @@ export function RoutineForm({ routine, onClose }: RoutineFormProps) {
 
           {/* Exercises */}
           <div className="relative">
-            <div className="flex items-center justify-between mb-4 sticky -top-6 z-20 bg-gym-dark py-4 -mx-6 px-6 shadow-[0_10px_20px_-10px_rgba(0,0,0,0.5)] border-b border-white/5">
+            <div className="flex items-center justify-between mb-4 sticky -top-6 z-20 bg-gym-dark py-10 -mx-6 px-6 shadow-[0_10px_20px_-10px_rgba(0,0,0,0.5)] border-b border-white/5 z-40">
               <h3 className="text-white font-display font-bold text-lg">Ejercicios</h3>
               <motion.button 
                 whileTap={{ scale: 0.9 }}
@@ -128,11 +155,25 @@ export function RoutineForm({ routine, onClose }: RoutineFormProps) {
                 <motion.div 
                   layout
                   initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
+                  animate={{ opacity: 1, scale: pressingId === ex.id ? 0.97 : 1, borderColor: pressingId === ex.id ? '#ef4444' : '#262626' }}
                   exit={{ opacity: 0, scale: 0.9, height: 0, marginBottom: 0 }}
-                  key={ex.id} className="bg-gym-card p-4 rounded-3xl border border-neutral-800 overflow-hidden"
+                  key={ex.id} 
+                  className={`bg-gym-card p-4 rounded-3xl border overflow-hidden select-none relative transition-colors ${pressingId === ex.id ? 'bg-red-500/5' : ''}`}
+                  onMouseDown={(e) => handlePressStart(ex.id, e)}
+                  onMouseUp={handlePressEnd}
+                  onMouseLeave={handlePressEnd}
+                  onTouchStart={(e) => handlePressStart(ex.id, e)}
+                  onTouchEnd={handlePressEnd}
                 >
-                  <div className="flex justify-between items-start mb-3">
+                  {pressingId === ex.id && (
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: '100%' }}
+                      transition={{ duration: 2, ease: "linear" }}
+                      className="absolute bottom-0 left-0 h-1 bg-red-500 z-10"
+                    />
+                  )}
+                  <div className="flex justify-between items-start mb-3 relative z-20">
                     <div className="flex items-center gap-2 flex-1 relative">
                        <span className="w-6 h-6 flex items-center justify-center bg-neutral-800 rounded-full text-xs text-gray-400 font-display font-bold">
                          {index + 1}
@@ -147,10 +188,13 @@ export function RoutineForm({ routine, onClose }: RoutineFormProps) {
                     </div>
                     <motion.button 
                       whileTap={{ scale: 0.8 }}
-                      onClick={() => handleRemoveExercise(ex.id)}
-                      className="p-2 bg-red-500/10 text-red-400 rounded-full hover:bg-red-500/20 ml-2"
+                      onClick={() => {
+                        setVideoUrlInput(ex.videoUrl || '');
+                        setVideoPromptId(ex.id);
+                      }}
+                      className={`p-2 rounded-full ml-2 transition-colors ${ex.videoUrl ? 'bg-white/10 text-white' : 'bg-neutral-800 text-gray-400'}`}
                     >
-                      <Trash2 size={16} />
+                      <Youtube size={16} />
                     </motion.button>
                   </div>
                   
@@ -232,6 +276,104 @@ export function RoutineForm({ routine, onClose }: RoutineFormProps) {
         </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {videoPromptId && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-gym-card p-6 rounded-[32px] border border-neutral-800 w-full max-w-sm shadow-2xl"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                 <div className="w-12 h-12 bg-[#38BDF8]/10 text-[#38BDF8] rounded-full flex items-center justify-center shrink-0">
+                    <Youtube size={24} />
+                 </div>
+                 <div>
+                    <h3 className="text-lg font-display font-bold text-white leading-tight">Video de YouTube</h3>
+                    <p className="text-xs text-gray-400">Pega el enlace para este ejercicio</p>
+                 </div>
+              </div>
+              
+              <input 
+                type="text"
+                autoFocus
+                value={videoUrlInput}
+                onChange={(e) => setVideoUrlInput(e.target.value)}
+                placeholder="https://www.youtube.com/..."
+                className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-2xl px-4 py-4 mb-6 focus:outline-none focus:border-[#38BDF8] transition-colors"
+              />
+
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setVideoPromptId(null)}
+                  className="flex-1 py-3.5 rounded-2xl bg-neutral-800 text-white font-bold transition-colors hover:bg-neutral-700 active:scale-95"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={() => {
+                    handleUpdateExercise(videoPromptId, { videoUrl: videoUrlInput.trim() });
+                    setVideoPromptId(null);
+                  }}
+                  className="flex-1 py-3.5 rounded-2xl bg-[#38BDF8] text-black font-bold transition-colors hover:bg-[#38BDF8]/90 active:scale-95 shadow-[0_0_15px_rgba(56,189,248,0.3)]"
+                >
+                  Guardar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {exerciseToDelete && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-gym-card p-6 rounded-[32px] border border-neutral-800 w-full max-w-sm text-center shadow-2xl"
+            >
+              <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={32} />
+              </div>
+              <h3 className="text-xl font-display font-bold text-white mb-2">Eliminar Ejercicio</h3>
+              <p className="text-gray-400 mb-8 text-sm px-4">
+                ¿Estás seguro de que quieres eliminar este ejercicio de la rutina? Esta acción no se puede deshacer.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setExerciseToDelete(null)}
+                  className="flex-1 py-3.5 rounded-2xl bg-neutral-800 text-white font-bold transition-colors hover:bg-neutral-700 active:scale-95"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={() => {
+                    handleRemoveExercise(exerciseToDelete);
+                    setExerciseToDelete(null);
+                  }}
+                  className="flex-1 py-3.5 rounded-2xl bg-red-500 text-white font-bold transition-colors hover:bg-red-600 active:scale-95 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

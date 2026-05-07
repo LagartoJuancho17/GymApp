@@ -9,6 +9,7 @@ export interface Exercise {
   reps: number;
   sets: number;
   rir?: number;
+  videoUrl?: string;
 }
 
 export interface ExerciseLog {

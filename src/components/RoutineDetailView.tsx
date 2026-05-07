@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { SlideToUnlock } from './SlideToUnlock';
 import { SecondaryTimer } from './SecondaryTimer';
-import { formatTime } from '../lib/utils';
+import { formatTime, getEmbedUrl } from '../lib/utils';
 
 interface RoutineDetailViewProps {
   routine: Routine;
@@ -44,6 +44,7 @@ export function RoutineDetailView({ routine, onClose }: RoutineDetailViewProps) 
   // Timers State
   const [isUnlockedForStop, setIsUnlockedForStop] = useState(false);
   const [trainingElapsed, setTrainingElapsed] = useState(0);
+  const [expandedVideoId, setExpandedVideoId] = useState<string | null>(null);
 
   useEffect(() => {
     let interval: any;
@@ -218,71 +219,104 @@ export function RoutineDetailView({ routine, onClose }: RoutineDetailViewProps) 
              return (
              <motion.div 
                layout
-               whileTap={{ scale: 0.98 }}
+               whileTap={{ scale: expandedVideoId === ex.id ? 1 : 0.98 }}
                key={ex.id} 
                onClick={() => handleToggleComplete(ex)}
-               className={`rounded-[24px] p-4 border shadow-lg flex items-center gap-4 cursor-pointer transition-all ${isCompleted ? 'bg-[#A482FF]/10 border-[#A482FF]/30' : 'bg-gym-card hover:bg-neutral-800 border-neutral-800'}`}
+               className={`rounded-[24px] p-4 border shadow-lg flex flex-col gap-4 cursor-pointer transition-all ${isCompleted ? 'bg-[#A482FF]/10 border-[#A482FF]/30' : 'bg-gym-card hover:bg-neutral-800 border-neutral-800'}`}
              >
-                <motion.div layout className={`w-10 h-10 rounded-full flex items-center justify-center font-display font-bold text-sm shrink-0 transition-colors ${isCompleted ? 'bg-[#A482FF] text-[#20104A] border-none' : 'bg-neutral-800 text-gym-lime'}`}>
-                   {isCompleted ? <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}><Check size={18} strokeWidth={3} /></motion.div> : idx + 1}
-                </motion.div>
-                <div className="flex-1 min-w-0">
-                   <h4 className={`font-bold text-base mb-1 truncate transition-colors ${isCompleted ? 'line-through text-[#A482FF]' : 'text-white'}`}>{ex.name}</h4>
-                   <div className="flex items-center gap-2 flex-wrap">
-                     <span className={`text-[10px] border px-2 py-0.5 rounded-md uppercase font-bold transition-colors ${getTypeColorClass(ex.type)}`}>{ex.type}</span>
-                     {ex.rir !== undefined && ex.rir !== 0 && (
-                       <span className="text-[10px] bg-neutral-800 text-gray-300 px-2 py-0.5 rounded-md uppercase font-bold">RIR: {ex.rir}</span>
-                     )}
-                     {diffElem}
-                   </div>
-                </div>
-                <div className="text-right shrink-0 flex flex-col items-end gap-1">
-                   <AnimatePresence mode="wait">
-                     {isCompleted ? (
-                       <motion.div key="completed" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}>
-                         <span className={`block font-display font-bold text-lg transition-colors text-[#A482FF]/70`}>{currentData.weight} <span className="text-xs text-gray-400 font-sans">kg</span></span>
-                         <span className={`block font-display font-medium text-sm transition-colors text-[#A482FF]/70`}>
-                           {ex.sets}x{currentData.reps}{ex.trackingType === 'time' ? 's' : ''}
-                         </span>
-                       </motion.div>
-                     ) : (
-                       <motion.div key="incomplete" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex flex-col items-end">
-                         <div className="flex items-center gap-1 justify-end mb-1">
-                           <input 
-                             type="number" 
-                             value={currentData.weight === undefined ? '' : currentData.weight}
-                             onChange={(e) => handleUpdateSessionData(ex.id, 'weight', Number(e.target.value))}
-                             onClick={(e) => e.stopPropagation()}
-                             className="bg-neutral-900 border border-neutral-700 rounded-lg w-14 text-center font-display font-bold text-white py-1 hide-arrows focus:outline-none focus:border-gym-lime"
-                           />
-                           <span className="text-xs text-gray-400 font-sans">kg</span>
-                         </div>
-                         <div className="flex items-center gap-1 justify-end">
-                           <span className="text-[#A482FF] font-display font-medium text-sm">{ex.sets}x</span>
-                           <input 
-                             type="number" 
-                             value={currentData.reps === undefined ? '' : currentData.reps}
-                             onChange={(e) => handleUpdateSessionData(ex.id, 'reps', Number(e.target.value))}
-                             onClick={(e) => e.stopPropagation()}
-                             className="bg-neutral-900 border border-neutral-700 rounded-lg w-12 text-center font-display font-bold text-[#A482FF] py-1 hide-arrows focus:outline-none focus:border-[#A482FF]"
-                           />
-                           {ex.trackingType === 'time' && <span className="text-xs text-[#A482FF] font-sans">s</span>}
-                         </div>
-                         {(currentData.weight !== ex.weight || currentData.reps !== ex.reps) && (
-                           <button
-                             onClick={(e) => {
-                               e.stopPropagation();
-                               handleSaveExerciseStats(ex.id, currentData.weight, currentData.reps);
-                             }}
-                             className="mt-2 text-[9px] uppercase font-bold text-black bg-gym-lime px-2 py-1 rounded"
-                           >
-                             Guardar
-                           </button>
-                         )}
-                       </motion.div>
-                     )}
-                   </AnimatePresence>
-                </div>
+               <div className="flex items-center gap-4 w-full">
+                 <motion.div layout className={`w-10 h-10 rounded-full flex items-center justify-center font-display font-bold text-sm shrink-0 transition-colors ${isCompleted ? 'bg-[#A482FF] text-[#20104A] border-none' : 'bg-neutral-800 text-gym-lime'}`}>
+                    {isCompleted ? <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}><Check size={18} strokeWidth={3} /></motion.div> : idx + 1}
+                 </motion.div>
+                 <div className="flex-1 min-w-0">
+                    <h4 className={`font-bold text-base mb-1 truncate transition-colors ${isCompleted ? 'line-through text-[#A482FF]' : 'text-white'}`}>{ex.name}</h4>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-[10px] border px-2 py-0.5 rounded-md uppercase font-bold transition-colors ${getTypeColorClass(ex.type)}`}>{ex.type}</span>
+                      {ex.rir !== undefined && ex.rir !== 0 && (
+                        <span className="text-[10px] bg-neutral-800 text-gray-300 px-2 py-0.5 rounded-md uppercase font-bold">RIR: {ex.rir}</span>
+                      )}
+                      {diffElem}
+                    </div>
+                    {ex.videoUrl && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setExpandedVideoId(expandedVideoId === ex.id ? null : ex.id); }}
+                        className="mt-2 text-xs text-white flex items-center gap-1 font-medium bg-white/10 px-2 py-1 rounded-md w-max"
+                      >
+                        <Play size={10} fill="currentColor" /> {expandedVideoId === ex.id ? 'Ocultar Video' : 'Ver Video'}
+                      </button>
+                    )}
+                 </div>
+                 <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                    <AnimatePresence mode="wait">
+                      {isCompleted ? (
+                        <motion.div key="completed" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}>
+                          <span className={`block font-display font-bold text-lg transition-colors text-[#A482FF]/70`}>{currentData.weight} <span className="text-xs text-gray-400 font-sans">kg</span></span>
+                          <span className={`block font-display font-medium text-sm transition-colors text-[#A482FF]/70`}>
+                            {ex.sets}x{currentData.reps}{ex.trackingType === 'time' ? 's' : ''}
+                          </span>
+                        </motion.div>
+                      ) : (
+                        <motion.div key="incomplete" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex flex-col items-end">
+                          <div className="flex items-center gap-1 justify-end mb-1">
+                            <input 
+                              type="number" 
+                              value={currentData.weight === undefined ? '' : currentData.weight}
+                              onChange={(e) => handleUpdateSessionData(ex.id, 'weight', Number(e.target.value))}
+                              onClick={(e) => e.stopPropagation()}
+                              className="bg-neutral-900 border border-neutral-700 rounded-lg w-14 text-center font-display font-bold text-white py-1 hide-arrows focus:outline-none focus:border-gym-lime"
+                            />
+                            <span className="text-xs text-gray-400 font-sans">kg</span>
+                          </div>
+                          <div className="flex items-center gap-1 justify-end">
+                            <span className="text-[#A482FF] font-display font-medium text-sm">{ex.sets}x</span>
+                            <input 
+                              type="number" 
+                              value={currentData.reps === undefined ? '' : currentData.reps}
+                              onChange={(e) => handleUpdateSessionData(ex.id, 'reps', Number(e.target.value))}
+                              onClick={(e) => e.stopPropagation()}
+                              className="bg-neutral-900 border border-neutral-700 rounded-lg w-12 text-center font-display font-bold text-[#A482FF] py-1 hide-arrows focus:outline-none focus:border-[#A482FF]"
+                            />
+                            {ex.trackingType === 'time' && <span className="text-xs text-[#A482FF] font-sans">s</span>}
+                          </div>
+                          {(currentData.weight !== ex.weight || currentData.reps !== ex.reps) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSaveExerciseStats(ex.id, currentData.weight, currentData.reps);
+                              }}
+                              className="mt-2 text-[9px] uppercase font-bold text-black bg-gym-lime px-2 py-1 rounded"
+                            >
+                              Guardar
+                            </button>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                 </div>
+               </div>
+
+               <AnimatePresence>
+                 {expandedVideoId === ex.id && ex.videoUrl && (
+                   <motion.div 
+                     initial={{ height: 0, opacity: 0 }}
+                     animate={{ height: 'auto', opacity: 1 }}
+                     exit={{ height: 0, opacity: 0 }}
+                     className="w-full rounded-xl overflow-hidden mt-2"
+                     onClick={(e) => e.stopPropagation()}
+                   >
+                     <iframe
+                       width="100%"
+                       height="250"
+                       src={getEmbedUrl(ex.videoUrl) || ''}
+                       title="YouTube video player"
+                       frameBorder="0"
+                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                       allowFullScreen
+                       className="bg-black/50"
+                     ></iframe>
+                   </motion.div>
+                 )}
+               </AnimatePresence>
              </motion.div>
              );
            })}
