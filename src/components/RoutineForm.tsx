@@ -17,7 +17,7 @@ export function RoutineForm({ routine, onClose }: RoutineFormProps) {
   const { addRoutine, updateRoutine } = useAppContext();
   
   const [name, setName] = useState(routine?.name || '');
-  const [assignedDay, setAssignedDay] = useState(routine?.assignedDay ?? 0);
+  const [assignedDay, setAssignedDay] = useState(routine?.assignedDay ?? (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1));
   const [exercises, setExercises] = useState<Exercise[]>(routine?.exercises || []);
 
   const getTypeColorClass = (type: ExerciseType) => {

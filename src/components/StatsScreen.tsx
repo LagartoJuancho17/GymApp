@@ -3,13 +3,6 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, L
 import { TrendingUp, Activity, Target } from 'lucide-react';
 import { useAppContext } from '../store';
 
-const volumeData = [
-  { month: 'Ene', volume: 12000 },
-  { month: 'Feb', volume: 14500 },
-  { month: 'Mar', volume: 13000 },
-  { month: 'Abr', volume: 18000 },
-];
-
 const COLORS = ['#CCFF00', '#A482FF', '#FFFFFF', '#FF5733', '#33FF57'];
 
 export function StatsScreen() {
@@ -28,8 +21,11 @@ export function StatsScreen() {
 
     exerciseLogs.forEach(log => {
       const logName = (log.exerciseName || '').trim().toLowerCase();
-      const type = log.type || exerciseTypes[logName] || '';
+      let type = log.type || exerciseTypes[logName] || '';
       
+      // Si el tipo es desconocido, asumimos 'Fuerza' para que el usuario igual vea su progreso
+      if (!type) type = 'Fuerza';
+
       if (type.trim().toLowerCase() !== 'fuerza') {
         return;
       }
@@ -60,6 +56,58 @@ export function StatsScreen() {
     return { weightData: data, topExercises };
   }, [exerciseLogs, routines]);
 
+  const volumeData = useMemo(() => {
+    const monthlyVolume: Record<string, number> = {};
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    
+    // Inicializar los últimos 6 meses para que el gráfico siempre se vea bien
+    const today = new Date();
+    const last6Months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const mName = monthNames[d.getMonth()];
+      monthlyVolume[mName] = 0;
+      last6Months.push(mName);
+    }
+
+    exerciseLogs.forEach(log => {
+      const d = new Date(log.date);
+      const monthLabel = monthNames[d.getMonth()];
+      if (monthlyVolume[monthLabel] !== undefined) {
+        const reps = Number(log.reps) || 0;
+        const weight = Number(log.weight) || 0;
+        monthlyVolume[monthLabel] += (weight * reps);
+      }
+    });
+
+    return last6Months.map(m => ({ month: m, volume: monthlyVolume[m] }));
+  }, [exerciseLogs]);
+
+  const { currentMonthVolume, currentMonthSessions } = useMemo(() => {
+    const now = new Date();
+    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    
+    let vol = 0;
+    exerciseLogs.forEach(log => {
+      if (log.date.startsWith(currentMonthStr)) {
+        vol += (Number(log.weight) || 0) * (Number(log.reps) || 0);
+      }
+    });
+
+    // Sesiones del mes, usamos los logs por dia
+    const daysWithLogs = new Set();
+    exerciseLogs.forEach(log => {
+      if (log.date.startsWith(currentMonthStr)) {
+        daysWithLogs.add(log.date.split('T')[0]);
+      }
+    });
+
+    return { 
+      currentMonthVolume: vol >= 1000 ? (vol / 1000).toFixed(1) + 'k' : vol.toString(),
+      currentMonthSessions: daysWithLogs.size
+    };
+  }, [exerciseLogs]);
+
   // If we don't have enough data, we could show dummy data or empty state.
   // For now, we will show what we have.
 
@@ -75,12 +123,12 @@ export function StatsScreen() {
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-[#A482FF]/10 border border-[#A482FF]/20 rounded-3xl p-5">
           <Target size={20} className="text-[#A482FF] mb-2" />
-          <span className="text-3xl font-display font-bold text-white block">18k</span>
+          <span className="text-3xl font-display font-bold text-white block">{currentMonthVolume}</span>
           <span className="text-xs text-gray-400 font-medium">Volumen Mensual (kg)</span>
         </div>
         <div className="bg-gym-lime/10 border border-gym-lime/20 rounded-3xl p-5">
           <Activity size={20} className="text-gym-lime mb-2" />
-          <span className="text-3xl font-display font-bold text-white block">12</span>
+          <span className="text-3xl font-display font-bold text-white block">{currentMonthSessions}</span>
           <span className="text-xs text-gray-400 font-medium">Sesiones (Mes)</span>
         </div>
       </div>

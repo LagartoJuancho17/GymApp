@@ -120,9 +120,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setExerciseLogs(dbLogs.map((l: any) => ({
             id: l.id,
             date: l.date,
-            weight: l.weight,
-            reps: l.reps,
+            weight: Number(l.weight),
+            reps: Number(l.reps),
             type: l.type,
+            trackingType: l.tracking_type,
+            rir: l.rir !== null ? Number(l.rir) : undefined,
             exerciseName: l.exercise_name !== undefined ? l.exercise_name : l.exerciseName
           })));
         } else {
@@ -260,7 +262,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         date: newLog.date,
         weight: newLog.weight,
         reps: newLog.reps,
-        exercise_name: newLog.exerciseName
+        exercise_name: newLog.exerciseName,
+        type: newLog.type,
+        tracking_type: newLog.trackingType,
+        rir: newLog.rir
       };
       const { error } = await db.from('exercise_logs').insert([payload]);
       if (error) console.error("Supabase Error guardando log:", error);

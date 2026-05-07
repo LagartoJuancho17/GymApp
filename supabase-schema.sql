@@ -16,7 +16,10 @@ CREATE TABLE IF NOT EXISTS exercise_logs (
     date TEXT NOT NULL,
     exercise_name TEXT NOT NULL,
     weight NUMERIC NOT NULL,
-    reps INTEGER NOT NULL
+    reps INTEGER NOT NULL,
+    type TEXT,
+    tracking_type TEXT,
+    rir INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS goals (
@@ -41,6 +44,10 @@ ALTER TABLE routines ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users
 ALTER TABLE exercise_logs ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) DEFAULT auth.uid();
 ALTER TABLE goals ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) DEFAULT auth.uid();
 ALTER TABLE completed_workouts ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) DEFAULT auth.uid();
+
+ALTER TABLE exercise_logs ADD COLUMN IF NOT EXISTS type TEXT;
+ALTER TABLE exercise_logs ADD COLUMN IF NOT EXISTS tracking_type TEXT;
+ALTER TABLE exercise_logs ADD COLUMN IF NOT EXISTS rir INTEGER;
 
 -- ==========================================
 -- PERMISOS PRIVADOS (Seguridad Multi-usuario)

@@ -26,7 +26,7 @@ export function Dashboard() {
   const { routines, completedExercises, exerciseLogs, goals, completedWorkouts, updateRoutine } = useAppContext();
   const [viewingRoutine, setViewingRoutine] = useState<Routine | null>(null);
   const [activeTab, setActiveTab] = useState('Todo');
-  const [selectedDate, setSelectedDate] = useState(5);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().getDate());
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [supabaseStatus, setSupabaseStatus] = useState<string>('Verificando conexión...');
   const [selectingRoutineForDay, setSelectingRoutineForDay] = useState(false);
@@ -77,8 +77,9 @@ export function Dashboard() {
 
   const attendedDaysThisMonth = useMemo(() => {
     const days = new Set<number>();
+    const currentMonthPrefix = new Date().toISOString().slice(0, 7);
     exerciseLogs.forEach(log => {
-      if (log.date.startsWith('2026-05')) {
+      if (log.date.startsWith(currentMonthPrefix)) {
         const day = parseInt(log.date.split('-')[2].substring(0, 2), 10);
         days.add(day);
       }
@@ -88,8 +89,9 @@ export function Dashboard() {
 
   const completedWorkoutDaysThisMonth = useMemo(() => {
     const days = new Set<number>();
+    const currentMonthPrefix = new Date().toISOString().slice(0, 7);
     completedWorkouts.forEach(workout => {
-      if (workout.date.startsWith('2026-05')) {
+      if (workout.date.startsWith(currentMonthPrefix)) {
         const day = parseInt(workout.date.split('-')[2].substring(0, 2), 10);
         days.add(day);
       }
@@ -97,26 +99,51 @@ export function Dashboard() {
     return days;
   }, [completedWorkouts]);
   
-  const weekDays = [
-    { day: 'L', date: 4, attended: attendedDaysThisMonth.has(4), completed: completedWorkoutDaysThisMonth.has(4), dayIndex: 0 },
-    { day: 'M', date: 5, attended: attendedDaysThisMonth.has(5), completed: completedWorkoutDaysThisMonth.has(5), dayIndex: 1 },
-    { day: 'M', date: 6, attended: attendedDaysThisMonth.has(6), completed: completedWorkoutDaysThisMonth.has(6), dayIndex: 2 },
-    { day: 'J', date: 7, attended: attendedDaysThisMonth.has(7), completed: completedWorkoutDaysThisMonth.has(7), dayIndex: 3 },
-    { day: 'V', date: 8, attended: attendedDaysThisMonth.has(8), completed: completedWorkoutDaysThisMonth.has(8), dayIndex: 4 },
-    { day: 'S', date: 9, attended: attendedDaysThisMonth.has(9), completed: completedWorkoutDaysThisMonth.has(9), dayIndex: 5 },
-    { day: 'D', date: 10, attended: attendedDaysThisMonth.has(10), completed: completedWorkoutDaysThisMonth.has(10), dayIndex: 6 },
-  ];
+  const weekDays = useMemo(() => {
+    const today = new Date();
+    const currentDayIndex = today.getDay() === 0 ? 6 : today.getDay() - 1;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - currentDayIndex);
+
+    const days = [];
+    const dayNames = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+    
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dateNum = d.getDate();
+      days.push({
+        day: dayNames[i],
+        date: dateNum,
+        attended: attendedDaysThisMonth.has(dateNum),
+        completed: completedWorkoutDaysThisMonth.has(dateNum),
+        dayIndex: i,
+        fullDate: d
+      });
+    }
+    return days;
+  }, [attendedDaysThisMonth, completedWorkoutDaysThisMonth]);
 
   const selectedDayInfo = weekDays.find(d => d.date === selectedDate);
-  const selectedDayIndex = selectedDayInfo ? selectedDayInfo.dayIndex : 2;
+  const selectedDayIndex = selectedDayInfo ? selectedDayInfo.dayIndex : (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1);
   const todaysRoutine = routines.find(r => r.assignedDay === selectedDayIndex);
 
   const fullCalendarDays = useMemo(() => {
     const days: (number | null)[] = [];
-    const emptySlots = 4; // May 2026 starts on Friday (Mon=0..Thu=3)
-    for (let i = 0; i < emptySlots; i++) days.push(null);
-    for (let i = 1; i <= 31; i++) days.push(i);
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const startingDayIndex = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
+    
+    for (let i = 0; i < startingDayIndex; i++) days.push(null);
+    for (let i = 1; i <= lastDay.getDate(); i++) days.push(i);
     return days;
+  }, []);
+
+  const currentMonthText = useMemo(() => {
+    const date = new Date();
+    const month = date.toLocaleString('es-ES', { month: 'long' });
+    return `${month.charAt(0).toUpperCase() + month.slice(1)} ${date.getFullYear()}`;
   }, []);
 
   if (viewingRoutine) {
@@ -142,7 +169,7 @@ export function Dashboard() {
             onClick={() => setShowFullCalendar(!showFullCalendar)}
             className="flex items-center gap-2 text-lg text-gray-300 font-sans hover:text-white transition group"
           >
-            Mayo 2026
+            {currentMonthText}
             <ChevronDown size={20} className={`transform transition-transform ${showFullCalendar ? 'rotate-180 text-gym-lime' : 'group-hover:text-white'}`} />
           </button>
           <div className="flex items-center bg-gym-card rounded-full p-1">
