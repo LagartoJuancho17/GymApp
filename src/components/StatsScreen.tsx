@@ -8,9 +8,8 @@ const COLORS = ['#CCFF00', '#A482FF', '#FFFFFF', '#FF5733', '#33FF57'];
 export function StatsScreen() {
   const { exerciseLogs, routines } = useAppContext();
 
-  const { weightData, topExercises } = useMemo(() => {
-    const groupedByDate: Record<string, any> = {};
-    const exercisesFound = new Set<string>();
+  const { exerciseCharts } = useMemo(() => {
+    const exerciseLogsMap: Record<string, any[]> = {};
 
     const exerciseTypes: Record<string, string> = {};
     routines.forEach(r => {
@@ -23,7 +22,6 @@ export function StatsScreen() {
       const logName = (log.exerciseName || '').trim().toLowerCase();
       let type = log.type || exerciseTypes[logName] || '';
       
-      // Si el tipo es desconocido, asumimos 'Fuerza' para que el usuario igual vea su progreso
       if (!type) type = 'Fuerza';
 
       if (type.trim().toLowerCase() !== 'fuerza') {
@@ -31,7 +29,7 @@ export function StatsScreen() {
       }
       
       if (!log.weight || log.weight === 0) {
-        return; // Only show exercises that actually have weight logged
+        return; 
       }
 
       const dateObj = new Date(log.date);
@@ -40,20 +38,28 @@ export function StatsScreen() {
       
       const realName = log.exerciseName;
 
-      if (!groupedByDate[dateKey]) {
-        groupedByDate[dateKey] = { rawDate: dateKey, date: displayDate };
+      if (!exerciseLogsMap[realName]) {
+        exerciseLogsMap[realName] = [];
       }
       
-      if (!groupedByDate[dateKey][realName] || log.weight > groupedByDate[dateKey][realName]) {
-        groupedByDate[dateKey][realName] = log.weight;
+      const existing = exerciseLogsMap[realName].find(d => d.rawDate === dateKey);
+      if (existing) {
+        if (log.weight > existing.weight) {
+          existing.weight = log.weight;
+        }
+      } else {
+        exerciseLogsMap[realName].push({ rawDate: dateKey, date: displayDate, weight: log.weight });
       }
-      exercisesFound.add(realName);
     });
 
-    const data = Object.values(groupedByDate).sort((a, b) => a.rawDate.localeCompare(b.rawDate));
-    const topExercises = Array.from(exercisesFound).slice(0, 5); // Take up to 5 for the chart
+    const charts = Object.entries(exerciseLogsMap).map(([name, data]) => {
+      return {
+        name,
+        data: data.sort((a, b) => a.rawDate.localeCompare(b.rawDate))
+      };
+    });
 
-    return { weightData: data, topExercises };
+    return { exerciseCharts: charts };
   }, [exerciseLogs, routines]);
 
   const volumeData = useMemo(() => {
@@ -133,48 +139,42 @@ export function StatsScreen() {
         </div>
       </div>
 
-      {/* Line Chart: Progression per exercise */}
+      {/* Line Chart Carousel: Progression per exercise */}
       <div className="bg-gym-card rounded-[32px] p-6 shadow-lg border border-neutral-800">
         <h2 className="text-white font-display font-bold text-lg mb-1">Evolución de Fuerza (Kg)</h2>
-        <p className="text-xs text-gray-400 mb-6 font-medium">Progresión de peso en ejercicios de fuerza</p>
+        <p className="text-xs text-gray-400 mb-6 font-medium">Desliza para ver la progresión de cada ejercicio</p>
         
-        {weightData.length > 0 ? (
-          <>
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={weightData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                  <XAxis dataKey="date" stroke="#888" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#888" fontSize={11} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#1C1C24', borderRadius: '16px', border: 'none', color: '#fff' }}
-                    itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
-                  />
-                  {topExercises.map((exName, i) => (
-                    <Line 
-                      key={exName}
-                      type="monotone" 
-                      dataKey={exName} 
-                      stroke={COLORS[i % COLORS.length]} 
-                      strokeWidth={3} 
-                      connectNulls={true}
-                      dot={{ r: 4, strokeWidth: 2 }} 
-                      activeDot={{ r: 6 }} 
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            
-            <div className="flex flex-wrap gap-3 mt-4">
-              {topExercises.map((exName, i) => (
-                <div key={exName} className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>
-                  <span className="text-xs text-gray-300">{exName}</span>
+        {exerciseCharts.length > 0 ? (
+          <div className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar -mx-6 px-6 pb-4 space-x-4">
+            {exerciseCharts.map((chart, i) => (
+              <div key={chart.name} className="snap-center shrink-0 w-[85%] md:w-[280px] bg-neutral-900/50 p-5 rounded-[24px] border border-white/5">
+                <h3 className="text-white font-display font-bold text-sm mb-4 text-center">{chart.name}</h3>
+                <div className="h-48 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chart.data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                      <XAxis dataKey="date" stroke="#888" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#888" fontSize={11} tickLine={false} axisLine={false} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1C1C24', borderRadius: '16px', border: 'none', color: '#fff' }}
+                        itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
+                        formatter={(value: any) => [`${value} kg`, chart.name]}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="weight" 
+                        name={chart.name}
+                        stroke={COLORS[i % COLORS.length]} 
+                        strokeWidth={3} 
+                        dot={{ r: 4, strokeWidth: 2, fill: '#1C1C24' }} 
+                        activeDot={{ r: 6 }} 
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
-          </>
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="h-48 flex items-center justify-center">
             <p className="text-sm text-gray-500 font-medium">No hay progresiones de peso aún.</p>

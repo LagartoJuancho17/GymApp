@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { SlideToUnlock } from './SlideToUnlock';
 import { SecondaryTimer } from './SecondaryTimer';
 import { formatTime, getEmbedUrl } from '../lib/utils';
+import { playSilentAudio, stopSilentAudio } from '../lib/audio';
 
 interface RoutineDetailViewProps {
   routine: Routine;
@@ -64,6 +65,37 @@ export function RoutineDetailView({ routine, onClose }: RoutineDetailViewProps) 
     setSessionData(initialData);
   }, [routine]);
 
+  const isThisRoutineActive = isTraining && activeRoutineId === routine.id;
+
+  useEffect(() => {
+    if (isThisRoutineActive) {
+      const incompleteExercises = routine.exercises.filter(ex => !completedExercises.includes(ex.id));
+      const currentExercise = incompleteExercises.length > 0 ? incompleteExercises[0] : null;
+
+      if ('mediaSession' in navigator) {
+        if (currentExercise) {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: `Actual: ${currentExercise.name}`,
+            artist: `Rutina: ${routine.name}`,
+            album: 'GymApp'
+          });
+        } else {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: '¡Entrenamiento Completado!',
+            artist: routine.name,
+            album: 'GymApp'
+          });
+        }
+      }
+
+      // Send a push notification if they background the app
+      if (currentExercise && 'Notification' in window && Notification.permission === 'granted') {
+        // We avoid spamming notifications, only send if it changed. 
+        // We can track the last notified exercise to prevent spam if we want.
+      }
+    }
+  }, [isThisRoutineActive, completedExercises, routine]);
+
   const handleUpdateSessionData = (id: string, field: 'weight' | 'reps', value: number) => {
     setSessionData(prev => ({
       ...prev,
@@ -112,15 +144,26 @@ export function RoutineDetailView({ routine, onClose }: RoutineDetailViewProps) 
 
   const handleStartTraining = () => {
     startTrainingGlobal(routine.id);
+    
+    // Request notification permissions
+    if ('Notification' in window && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+    
+    // Start silent audio to keep media session alive on mobile
+    playSilentAudio();
   };
 
   const handleStopTraining = () => {
     stopTrainingGlobal();
     setIsUnlockedForStop(false);
     setTrainingElapsed(0);
+    stopSilentAudio();
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = null;
+    }
   };
 
-  const isThisRoutineActive = isTraining && activeRoutineId === routine.id;
 
   return (
     <motion.div 

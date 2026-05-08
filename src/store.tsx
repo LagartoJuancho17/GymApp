@@ -360,15 +360,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteCompletedWorkout = async (id: string) => {
+    const workoutToRestore = completedWorkouts.find(w => w.id === id);
+    if (!workoutToRestore) return;
+
     setCompletedWorkouts(prev => prev.filter(w => w.id !== id));
+    
     const db = supabase();
     if (db) {
-      const { error } = await db.from('completed_workouts').delete().eq('id', id);
-      if (error) {
-        console.error("Supabase Error eliminando workout:", error);
-        toast.error("Error eliminando entrenamiento");
-      } else {
-        toast.success("Entrenamiento eliminado");
+      try {
+        const { error } = await db.from('completed_workouts').delete().eq('id', id);
+        if (error) {
+          console.error("Supabase Error eliminando workout:", error);
+          toast.error(`Error eliminando entrenamiento: ${error.message}`);
+          setCompletedWorkouts(prev => [...prev, workoutToRestore]);
+        } else {
+          toast.success("Entrenamiento eliminado");
+        }
+      } catch (err: any) {
+        console.error("Excepción eliminando workout:", err);
+        toast.error(`Error de red al eliminar: ${err.message}`);
+        setCompletedWorkouts(prev => [...prev, workoutToRestore]);
       }
     }
   };
