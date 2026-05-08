@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Goal } from '../types';
 
 export function ProfileScreen() {
-  const { user, completedWorkouts, signOut, goals, setGoals } = useAppContext();
+  const { user, completedWorkouts, signOut, goals, setGoals, deleteCompletedWorkout } = useAppContext();
   
   const [isEditingGoals, setIsEditingGoals] = useState(false);
   const [goalsList, setGoalsList] = useState<Omit<Goal, 'id'>[]>([]);
@@ -95,6 +95,13 @@ export function ProfileScreen() {
                 <p className="text-xs text-gray-400">{new Date(workout.date).toLocaleDateString()}</p>
               </div>
             </div>
+            <button 
+              onClick={() => deleteCompletedWorkout(workout.id)}
+              className="text-red-400/50 hover:text-red-400 hover:bg-red-400/10 p-2 rounded-full transition-colors"
+              title="Eliminar logro"
+            >
+              <Trash2 size={18} />
+            </button>
           </motion.div>
         ))}
 

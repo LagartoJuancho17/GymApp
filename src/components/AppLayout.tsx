@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Home, Dumbbell, BarChart2, PlusCircle, User } from 'lucide-react';
+import { Shield, Home, Dumbbell, BarChart2, PlusCircle, User } from 'lucide-react';
 import { Dashboard } from './Dashboard';
 import { RoutinesScreen } from './RoutinesScreen';
 import { StatsScreen } from './StatsScreen';
 import { ProfileScreen } from './ProfileScreen';
+import { AdminScreen } from './AdminScreen';
 import { OnboardingScreen } from './OnboardingScreen';
 import { LoginScreen } from './LoginScreen';
 import { AppProvider, useAppContext } from '../store';
@@ -12,7 +13,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 import { GlobalActiveTrainingWidget } from './GlobalActiveTrainingWidget';
 
-export type ScreenType = 'home' | 'routines' | 'stats' | 'profile';
+export type ScreenType = 'home' | 'routines' | 'stats' | 'profile' | 'admin';
 
 function AppContent() {
   const [activeScreen, setActiveScreen] = useState<ScreenType>('home');
@@ -73,6 +74,11 @@ function AppContent() {
               <ProfileScreen />
             </motion.div>
           )}
+          {activeScreen === 'admin' && user?.email === 'totoarr17@gmail.com' && (
+            <motion.div key="admin" variants={fadeInVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.2 }} className="flex-1 overflow-hidden relative flex flex-col hide-scrollbar">
+              <AdminScreen />
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
       
@@ -100,6 +106,15 @@ function AppContent() {
             {activeScreen === 'stats' && <motion.div layoutId="nav-glow" className="absolute inset-0 w-10 h-10 bg-gym-lime -z-10 rounded-full opacity-40 blur-md"></motion.div>}
             <BarChart2 size={28} strokeWidth={activeScreen === 'stats' ? 2.5 : 2} />
           </button>
+          {user?.email === 'totoarr17@gmail.com' && (
+            <button 
+              onClick={() => handleNavClick('admin')}
+              className={`relative transition-colors ${activeScreen === 'admin' ? 'text-white' : 'text-gray-500 hover:text-white'}`}
+            >
+              {activeScreen === 'admin' && <motion.div layoutId="nav-glow" className="absolute inset-0 w-10 h-10 bg-red-500 -z-10 rounded-full opacity-40 blur-md"></motion.div>}
+              <Shield size={28} strokeWidth={activeScreen === 'admin' ? 2.5 : 2} />
+            </button>
+          )}
           <button 
             onClick={() => handleNavClick('profile')}
             className={`relative transition-colors ${activeScreen === 'profile' ? 'text-white' : 'text-gray-500 hover:text-white'}`}

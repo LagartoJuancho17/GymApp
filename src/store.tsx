@@ -28,6 +28,7 @@ interface AppState {
   addExerciseLog: (log: Omit<ExerciseLog, 'id'>) => void;
   completedWorkouts: CompletedWorkout[];
   addCompletedWorkout: (workout: Omit<CompletedWorkout, 'id'>) => void;
+  deleteCompletedWorkout: (id: string) => void;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -80,6 +81,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Listen for changes on auth state (sign in, sign out, etc.)
     const { data: { subscription } } = db.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      if (session?.user?.user_metadata?.has_completed_onboarding) {
+        setHasCompletedOnboarding(true);
+      }
       setIsLoadingAuth(false);
     });
 
@@ -136,10 +140,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (goalsError) console.error("Supabase Error fetch goals:", goalsError);
         else if (dbGoals && dbGoals.length > 0) {
           setGoalsState(dbGoals);
-          setHasCompletedOnboarding(true);
         } else {
           setGoalsState([]);
-          setHasCompletedOnboarding(false);
+        }
+
+        // Check onboarding status from user metadata
+        if (user.user_metadata?.has_completed_onboarding) {
+          setHasCompletedOnboarding(true);
+        } else {
+          // Si no tiene el flag, mostramos onboarding a menos que ya tuviera metas (retrocompatibilidad)
+          if (dbGoals && dbGoals.length > 0) {
+            setHasCompletedOnboarding(true);
+            await db.auth.updateUser({ data: { has_completed_onboarding: true } });
+          } else {
+            setHasCompletedOnboarding(false);
+          }
         }
 
         // Fetch completed workouts
@@ -241,15 +256,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const setGoals = async (newGoals: Goal[]) => {
+    const currentGoalsIds = goals.map(g => g.id);
+    const newGoalsIds = newGoals.map(g => g.id);
+    const goalsToDelete = currentGoalsIds.filter(id => !newGoalsIds.includes(id));
+
     setGoalsState(newGoals);
     const db = supabase();
     if (db) {
-      const { error } = await db.from('goals').upsert(newGoals);
-      if (error) console.error("Supabase Error guardando Metas:", error);
+      if (goalsToDelete.length > 0) {
+        await db.from('goals').delete().in('id', goalsToDelete);
+      }
+      if (newGoals.length > 0) {
+        const { error } = await db.from('goals').upsert(newGoals);
+        if (error) console.error("Supabase Error guardando Metas:", error);
+      }
     }
   };
   
-  const completeOnboarding = () => setHasCompletedOnboarding(true);
+  const completeOnboarding = async () => {
+    setHasCompletedOnboarding(true);
+    const db = supabase();
+    if (db && user) {
+      await db.auth.updateUser({ data: { has_completed_onboarding: true } });
+    }
+  };
 
   const addExerciseLog = async (log: Omit<ExerciseLog, 'id'>) => {
     const newLog = { ...log, id: uuidv4() };
@@ -291,6 +321,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const deleteCompletedWorkout = async (id: string) => {
+    setCompletedWorkouts(prev => prev.filter(w => w.id !== id));
+    const db = supabase();
+    if (db) {
+      const { error } = await db.from('completed_workouts').delete().eq('id', id);
+      if (error) {
+        console.error("Supabase Error eliminando workout:", error);
+        toast.error("Error eliminando entrenamiento");
+      } else {
+        toast.success("Entrenamiento eliminado");
+      }
+    }
+  };
+
   return (
     <AppContext.Provider value={{ 
       user,
@@ -314,7 +358,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setGoals,
       completeOnboarding,
       addExerciseLog,
-      addCompletedWorkout
+      addCompletedWorkout,
+      deleteCompletedWorkout
     }}>
       {children}
     </AppContext.Provider>

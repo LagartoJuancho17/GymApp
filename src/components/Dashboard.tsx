@@ -100,29 +100,33 @@ export function Dashboard() {
   }, [completedWorkouts]);
   
   const weekDays = useMemo(() => {
-    const today = new Date();
-    const currentDayIndex = today.getDay() === 0 ? 6 : today.getDay() - 1;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - currentDayIndex);
+    const anchorDate = new Date();
+    anchorDate.setDate(selectedDate);
+    
+    const startDay = new Date(anchorDate);
+    startDay.setDate(anchorDate.getDate() - 1);
 
     const days = [];
-    const dayNames = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+    const dayNames = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
     
     for (let i = 0; i < 7; i++) {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
+      const d = new Date(startDay);
+      d.setDate(startDay.getDate() + i);
       const dateNum = d.getDate();
+      const dayOfWeek = d.getDay();
+      const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
       days.push({
-        day: dayNames[i],
+        day: dayNames[dayOfWeek],
         date: dateNum,
         attended: attendedDaysThisMonth.has(dateNum),
         completed: completedWorkoutDaysThisMonth.has(dateNum),
-        dayIndex: i,
+        dayIndex: dayIndex,
         fullDate: d
       });
     }
     return days;
-  }, [attendedDaysThisMonth, completedWorkoutDaysThisMonth]);
+  }, [selectedDate, attendedDaysThisMonth, completedWorkoutDaysThisMonth]);
 
   const selectedDayInfo = weekDays.find(d => d.date === selectedDate);
   const selectedDayIndex = selectedDayInfo ? selectedDayInfo.dayIndex : (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1);
