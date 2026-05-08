@@ -1,9 +1,9 @@
-import React, { useState, useRef } from 'react';
-import { ChevronLeft, Plus, Save, Youtube, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronLeft, Plus, Save, Youtube, Trash2, GripVertical } from 'lucide-react';
 import { Routine, Exercise, ExerciseType } from '../types';
 import { useAppContext } from '../store';
 import { v4 as uuidv4 } from 'uuid';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, Reorder, useDragControls } from 'motion/react';
 
 interface RoutineFormProps {
   routine: Routine | null;
@@ -13,12 +13,153 @@ interface RoutineFormProps {
 const EXERCISE_TYPES: ExerciseType[] = ['Potencia', 'Movilidad', 'Zona Media', 'Fuerza', 'Estructura', 'Accesorio'];
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
+interface ExerciseItemProps {
+  ex: Exercise;
+  index: number;
+  handleUpdateExercise: (id: string, updates: Partial<Exercise>) => void;
+  setVideoUrlInput: (url: string) => void;
+  setVideoPromptId: (id: string) => void;
+  getTypeColorClass: (type: ExerciseType) => string;
+  isDeleteMode: boolean;
+  setExerciseToDelete: (id: string | null) => void;
+}
+
+function ExerciseItem({
+  ex, index, handleUpdateExercise, setVideoUrlInput, setVideoPromptId, getTypeColorClass, isDeleteMode, setExerciseToDelete
+}: ExerciseItemProps) {
+  const dragControls = useDragControls();
+
+  return (
+    <Reorder.Item
+      value={ex}
+      id={ex.id}
+      dragListener={false}
+      dragControls={dragControls}
+      layout
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1, borderColor: '#262626' }}
+      exit={{ opacity: 0, scale: 0.9, height: 0, marginBottom: 0 }}
+      className={`bg-gym-card p-4 rounded-3xl border overflow-hidden select-none relative transition-colors`}
+    >
+      <div className="flex justify-between items-start mb-3 relative z-20">
+        <div className="flex items-center gap-2 flex-1 relative">
+           {isDeleteMode ? (
+             <motion.button
+               initial={{ scale: 0 }}
+               animate={{ scale: 1 }}
+               whileTap={{ scale: 0.8 }}
+               onClick={() => setExerciseToDelete(ex.id)}
+               className="p-1 -ml-1 text-red-500 hover:text-red-400"
+             >
+               <Trash2 size={20} />
+             </motion.button>
+           ) : (
+             <div
+               onPointerDown={(e) => dragControls.start(e)}
+               className="touch-none p-1 -ml-1 text-gray-500 hover:text-white cursor-grab active:cursor-grabbing"
+             >
+               <GripVertical size={20} />
+             </div>
+           )}
+           <span className="w-6 h-6 shrink-0 flex items-center justify-center bg-neutral-800 rounded-full text-xs text-gray-400 font-display font-bold">
+             {index + 1}
+           </span>
+           <input 
+              type="text"
+              value={ex.name}
+              onChange={(e) => handleUpdateExercise(ex.id, { name: e.target.value })}
+              placeholder="Nombre del Ejercicio"
+              className="bg-transparent text-white font-bold font-display text-lg focus:outline-none w-full min-w-0"
+           />
+        </div>
+        <motion.button 
+          whileTap={{ scale: 0.8 }}
+          onClick={() => {
+            setVideoUrlInput(ex.videoUrl || '');
+            setVideoPromptId(ex.id);
+          }}
+          className={`p-2 shrink-0 rounded-full ml-2 transition-colors ${ex.videoUrl ? 'bg-white/10 text-white' : 'bg-neutral-800 text-gray-400'}`}
+        >
+          <Youtube size={16} />
+        </motion.button>
+      </div>
+      
+      {/* Type Selection */}
+      <div className="mb-4 flex gap-2">
+        <select 
+          value={ex.type}
+          onChange={(e) => handleUpdateExercise(ex.id, { type: e.target.value as ExerciseType })}
+          className={`bg-neutral-800 text-xs font-bold uppercase rounded-xl px-3 py-1.5 focus:outline-none appearance-none ${getTypeColorClass(ex.type)}`}
+        >
+          {EXERCISE_TYPES.map(type => (
+            <option key={type} value={type}>{type}</option>
+          ))}
+        </select>
+        
+        <select 
+          value={ex.trackingType || 'reps'}
+          onChange={(e) => handleUpdateExercise(ex.id, { trackingType: e.target.value as 'reps' | 'time' })}
+          className="bg-neutral-800 text-gray-300 text-xs font-bold uppercase rounded-xl px-3 py-1.5 focus:outline-none appearance-none"
+        >
+          <option value="reps">Reps</option>
+          <option value="time">Tiempo</option>
+        </select>
+      </div>
+
+      {/* Metrics */}
+      <div className="grid grid-cols-4 gap-2">
+        <div className="bg-neutral-900/50 p-2 rounded-2xl text-center">
+          <span className="block text-[10px] uppercase text-gray-500 mb-1">Peso (kg)</span>
+          <input 
+            type="number"
+            value={ex.weight || ''}
+            onChange={(e) => handleUpdateExercise(ex.id, { weight: Number(e.target.value) })}
+            className="w-full bg-transparent text-center text-white font-display font-bold text-lg focus:outline-none hide-arrows"
+            placeholder="0"
+          />
+        </div>
+        <div className="bg-neutral-900/50 p-2 rounded-2xl text-center">
+          <span className="block text-[10px] uppercase text-gray-500 mb-1">{(ex.trackingType === 'time') ? 'Segundos' : 'Reps'}</span>
+          <input 
+            type="number"
+            value={ex.reps || ''}
+            onChange={(e) => handleUpdateExercise(ex.id, { reps: Number(e.target.value) })}
+            className="w-full bg-transparent text-center text-white font-display font-bold text-lg focus:outline-none hide-arrows"
+            placeholder="0"
+          />
+        </div>
+        <div className="bg-neutral-900/50 p-2 rounded-2xl text-center">
+          <span className="block text-[10px] uppercase text-gray-500 mb-1">Series</span>
+          <input 
+            type="number"
+            value={ex.sets || ''}
+            onChange={(e) => handleUpdateExercise(ex.id, { sets: Number(e.target.value) })}
+            className="w-full bg-transparent text-center text-white font-display font-bold text-lg focus:outline-none hide-arrows"
+            placeholder="0"
+          />
+        </div>
+        <div className="bg-neutral-900/50 p-2 rounded-2xl text-center">
+          <span className="block text-[10px] uppercase text-gray-500 mb-1">RIR (Opc.)</span>
+          <input 
+            type="number"
+            value={ex.rir || ''}
+            onChange={(e) => handleUpdateExercise(ex.id, { rir: Number(e.target.value) })}
+            className="w-full bg-transparent text-center text-white font-display font-bold text-lg focus:outline-none hide-arrows"
+            placeholder="—"
+          />
+        </div>
+      </div>
+    </Reorder.Item>
+  );
+}
+
 export function RoutineForm({ routine, onClose }: RoutineFormProps) {
   const { addRoutine, updateRoutine } = useAppContext();
   
   const [name, setName] = useState(routine?.name || '');
   const [assignedDay, setAssignedDay] = useState(routine?.assignedDay ?? (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1));
   const [exercises, setExercises] = useState<Exercise[]>(routine?.exercises || []);
+  const [isDeleteMode, setIsDeleteMode] = useState(false);
 
   const getTypeColorClass = (type: ExerciseType) => {
     switch (type) {
@@ -58,32 +199,9 @@ export function RoutineForm({ routine, onClose }: RoutineFormProps) {
     onClose();
   };
 
-  const [pressingId, setPressingId] = useState<string | null>(null);
   const [exerciseToDelete, setExerciseToDelete] = useState<string | null>(null);
   const [videoPromptId, setVideoPromptId] = useState<string | null>(null);
   const [videoUrlInput, setVideoUrlInput] = useState<string>('');
-  const pressTimer = useRef<NodeJS.Timeout | null>(null);
-
-  const handlePressStart = (id: string, e: React.MouseEvent | React.TouchEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.tagName.toLowerCase() === 'input' || target.tagName.toLowerCase() === 'select' || target.tagName.toLowerCase() === 'button' || target.closest('button')) {
-      return;
-    }
-    setPressingId(id);
-    pressTimer.current = setTimeout(() => {
-      setPressingId(null);
-      setExerciseToDelete(id);
-      if (navigator.vibrate) navigator.vibrate([100]);
-    }, 2000);
-  };
-
-  const handlePressEnd = () => {
-    if (pressTimer.current) {
-      clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
-    setPressingId(null);
-  };
 
   return (
     <motion.div 
@@ -140,132 +258,41 @@ export function RoutineForm({ routine, onClose }: RoutineFormProps) {
           <div className="relative">
             <div className="flex items-center justify-between mb-4 sticky -top-6 z-20 bg-gym-dark py-10 -mx-6 px-6 shadow-[0_10px_20px_-10px_rgba(0,0,0,0.5)] border-b border-white/5 z-40">
               <h3 className="text-white font-display font-bold text-lg">Ejercicios</h3>
-              <motion.button 
-                whileTap={{ scale: 0.9 }}
-                onClick={handleAddExercise}
-                className="flex items-center gap-1 text-xs font-bold text-gym-lime uppercase px-3 py-1.5 bg-gym-lime/10 rounded-full"
-              >
-                <Plus size={14} /> Añadir
-              </motion.button>
+              <div className="flex items-center gap-2">
+                <motion.button 
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setIsDeleteMode(!isDeleteMode)}
+                  className={`flex items-center justify-center w-8 h-8 rounded-full transition-colors ${isDeleteMode ? 'bg-red-500 text-white' : 'bg-red-500/10 text-red-500'}`}
+                >
+                  <Trash2 size={16} />
+                </motion.button>
+                <motion.button 
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleAddExercise}
+                  className="flex items-center gap-1 text-xs font-bold text-gym-lime uppercase px-3 py-1.5 bg-gym-lime/10 rounded-full"
+                >
+                  <Plus size={14} /> Añadir
+                </motion.button>
+              </div>
             </div>
 
-          <div className="space-y-4">
+          <Reorder.Group axis="y" values={exercises} onReorder={setExercises} className="space-y-4">
             <AnimatePresence>
               {exercises.map((ex, index) => (
-                <motion.div 
-                  layout
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: pressingId === ex.id ? 0.97 : 1, borderColor: pressingId === ex.id ? '#ef4444' : '#262626' }}
-                  exit={{ opacity: 0, scale: 0.9, height: 0, marginBottom: 0 }}
-                  key={ex.id} 
-                  className={`bg-gym-card p-4 rounded-3xl border overflow-hidden select-none relative transition-colors ${pressingId === ex.id ? 'bg-red-500/5' : ''}`}
-                  onMouseDown={(e) => handlePressStart(ex.id, e)}
-                  onMouseUp={handlePressEnd}
-                  onMouseLeave={handlePressEnd}
-                  onTouchStart={(e) => handlePressStart(ex.id, e)}
-                  onTouchEnd={handlePressEnd}
-                >
-                  {pressingId === ex.id && (
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: '100%' }}
-                      transition={{ duration: 2, ease: "linear" }}
-                      className="absolute bottom-0 left-0 h-1 bg-red-500 z-10"
-                    />
-                  )}
-                  <div className="flex justify-between items-start mb-3 relative z-20">
-                    <div className="flex items-center gap-2 flex-1 relative">
-                       <span className="w-6 h-6 flex items-center justify-center bg-neutral-800 rounded-full text-xs text-gray-400 font-display font-bold">
-                         {index + 1}
-                       </span>
-                       <input 
-                          type="text"
-                          value={ex.name}
-                          onChange={(e) => handleUpdateExercise(ex.id, { name: e.target.value })}
-                          placeholder="Nombre del Ejercicio"
-                          className="bg-transparent text-white font-bold font-display text-lg focus:outline-none w-full"
-                       />
-                    </div>
-                    <motion.button 
-                      whileTap={{ scale: 0.8 }}
-                      onClick={() => {
-                        setVideoUrlInput(ex.videoUrl || '');
-                        setVideoPromptId(ex.id);
-                      }}
-                      className={`p-2 rounded-full ml-2 transition-colors ${ex.videoUrl ? 'bg-white/10 text-white' : 'bg-neutral-800 text-gray-400'}`}
-                    >
-                      <Youtube size={16} />
-                    </motion.button>
-                  </div>
-                  
-                  {/* Type Selection */}
-                  <div className="mb-4 flex gap-2">
-                    <select 
-                      value={ex.type}
-                      onChange={(e) => handleUpdateExercise(ex.id, { type: e.target.value as ExerciseType })}
-                      className={`bg-neutral-800 text-xs font-bold uppercase rounded-xl px-3 py-1.5 focus:outline-none appearance-none ${getTypeColorClass(ex.type)}`}
-                    >
-                      {EXERCISE_TYPES.map(type => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
-                    </select>
-                    
-                    <select 
-                      value={ex.trackingType || 'reps'}
-                      onChange={(e) => handleUpdateExercise(ex.id, { trackingType: e.target.value as 'reps' | 'time' })}
-                      className="bg-neutral-800 text-gray-300 text-xs font-bold uppercase rounded-xl px-3 py-1.5 focus:outline-none appearance-none"
-                    >
-                      <option value="reps">Reps</option>
-                      <option value="time">Tiempo</option>
-                    </select>
-                  </div>
-
-                  {/* Metrics */}
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className="bg-neutral-900/50 p-2 rounded-2xl text-center">
-                      <span className="block text-[10px] uppercase text-gray-500 mb-1">Peso (kg)</span>
-                      <input 
-                        type="number"
-                        value={ex.weight || ''}
-                        onChange={(e) => handleUpdateExercise(ex.id, { weight: Number(e.target.value) })}
-                        className="w-full bg-transparent text-center text-white font-display font-bold text-lg focus:outline-none hide-arrows"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div className="bg-neutral-900/50 p-2 rounded-2xl text-center">
-                      <span className="block text-[10px] uppercase text-gray-500 mb-1">{(ex.trackingType === 'time') ? 'Segundos' : 'Reps'}</span>
-                      <input 
-                        type="number"
-                        value={ex.reps || ''}
-                        onChange={(e) => handleUpdateExercise(ex.id, { reps: Number(e.target.value) })}
-                        className="w-full bg-transparent text-center text-white font-display font-bold text-lg focus:outline-none hide-arrows"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div className="bg-neutral-900/50 p-2 rounded-2xl text-center">
-                      <span className="block text-[10px] uppercase text-gray-500 mb-1">Series</span>
-                      <input 
-                        type="number"
-                        value={ex.sets || ''}
-                        onChange={(e) => handleUpdateExercise(ex.id, { sets: Number(e.target.value) })}
-                        className="w-full bg-transparent text-center text-white font-display font-bold text-lg focus:outline-none hide-arrows"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div className="bg-neutral-900/50 p-2 rounded-2xl text-center">
-                      <span className="block text-[10px] uppercase text-gray-500 mb-1">RIR (Opc.)</span>
-                      <input 
-                        type="number"
-                        value={ex.rir || ''}
-                        onChange={(e) => handleUpdateExercise(ex.id, { rir: Number(e.target.value) })}
-                        className="w-full bg-transparent text-center text-white font-display font-bold text-lg focus:outline-none hide-arrows"
-                        placeholder="—"
-                      />
-                    </div>
-                  </div>
-                </motion.div>
+                <ExerciseItem 
+                  key={ex.id}
+                  ex={ex}
+                  index={index}
+                  handleUpdateExercise={handleUpdateExercise}
+                  setVideoUrlInput={setVideoUrlInput}
+                  setVideoPromptId={setVideoPromptId}
+                  getTypeColorClass={getTypeColorClass}
+                  isDeleteMode={isDeleteMode}
+                  setExerciseToDelete={setExerciseToDelete}
+                />
               ))}
             </AnimatePresence>
+          </Reorder.Group>
             
             {exercises.length === 0 && (
               <p className="text-center text-sm text-gray-500 py-4">
@@ -274,9 +301,7 @@ export function RoutineForm({ routine, onClose }: RoutineFormProps) {
             )}
           </div>
         </div>
-        </div>
       </div>
-
       <AnimatePresence>
         {videoPromptId && (
           <motion.div 
