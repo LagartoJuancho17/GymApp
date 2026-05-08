@@ -194,57 +194,95 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addRoutine = async (routine: Omit<Routine, 'id'>) => {
     const newRoutine = { ...routine, id: uuidv4() };
+    // Optimistic update
     setRoutines(prev => [...prev, newRoutine]);
 
     const db = supabase();
     if (db) {
-      const payload = {
-        id: newRoutine.id,
-        name: newRoutine.name,
-        assigned_day: newRoutine.assignedDay,
-        exercises: newRoutine.exercises
-      };
-      const { error } = await db.from('routines').insert([payload]);
-      if (error) {
-        console.error("Supabase Error Insertando Rutina:", error);
-        toast.error(`Error guardando rutina: ${error.message}`);
-      } else {
-        toast.success("Rutina creada correctamente");
+      try {
+        const payload = {
+          id: newRoutine.id,
+          name: newRoutine.name,
+          assigned_day: newRoutine.assignedDay,
+          exercises: newRoutine.exercises
+        };
+        const { error } = await db.from('routines').insert([payload]);
+        if (error) {
+          console.error("Supabase Error Insertando Rutina:", error);
+          toast.error(`Error guardando rutina en base de datos: ${error.message}`);
+          // Revert on error
+          setRoutines(prev => prev.filter(r => r.id !== newRoutine.id));
+        } else {
+          toast.success("Rutina creada correctamente");
+        }
+      } catch (err: any) {
+        console.error("Excepción Insertando Rutina:", err);
+        toast.error(`Error de conexión al guardar rutina: ${err.message}`);
+        // Revert on error
+        setRoutines(prev => prev.filter(r => r.id !== newRoutine.id));
       }
     }
   };
 
   const updateRoutine = async (id: string, updatedFields: Partial<Routine>) => {
+    // Save original in case we need to revert
+    const originalRoutine = routines.find(r => r.id === id);
+    if (!originalRoutine) return;
+    
+    // Optimistic update
     setRoutines(prev => prev.map(r => r.id === id ? { ...r, ...updatedFields } : r));
 
     const db = supabase();
     if (db) {
-      const payload: any = { ...updatedFields };
-      if (payload.assignedDay !== undefined) {
-        payload.assigned_day = payload.assignedDay;
-        delete payload.assignedDay;
-      }
-      const { error } = await db.from('routines').update(payload).eq('id', id);
-      if (error) {
-        console.error("Supabase Error Actualizando Rutina:", error);
-        toast.error(`Error actualizando rutina: ${error.message}`);
-      } else {
-        toast.success("Rutina actualizada");
+      try {
+        const payload: any = { ...updatedFields };
+        if (payload.assignedDay !== undefined) {
+          payload.assigned_day = payload.assignedDay;
+          delete payload.assignedDay;
+        }
+        const { error } = await db.from('routines').update(payload).eq('id', id);
+        if (error) {
+          console.error("Supabase Error Actualizando Rutina:", error);
+          toast.error(`Error actualizando rutina en base de datos: ${error.message}`);
+          // Revert
+          setRoutines(prev => prev.map(r => r.id === id ? originalRoutine : r));
+        } else {
+          toast.success("Rutina actualizada");
+        }
+      } catch (err: any) {
+        console.error("Excepción Actualizando Rutina:", err);
+        toast.error(`Error de conexión al actualizar rutina: ${err.message}`);
+        // Revert
+        setRoutines(prev => prev.map(r => r.id === id ? originalRoutine : r));
       }
     }
   };
 
   const deleteRoutine = async (id: string) => {
+    // Save original in case we need to revert
+    const routineToRestore = routines.find(r => r.id === id);
+    if (!routineToRestore) return;
+
+    // Optimistic update
     setRoutines(prev => prev.filter(r => r.id !== id));
 
     const db = supabase();
     if (db) {
-      const { error } = await db.from('routines').delete().eq('id', id);
-      if (error) {
-        console.error("Supabase Error Eliminando Rutina:", error);
-        toast.error(`Error eliminando rutina: ${error.message}`);
-      } else {
-        toast.success("Eliminado correctamente");
+      try {
+        const { error } = await db.from('routines').delete().eq('id', id);
+        if (error) {
+          console.error("Supabase Error Eliminando Rutina:", error);
+          toast.error(`Error eliminando rutina en base de datos: ${error.message}`);
+          // Revert
+          setRoutines(prev => [...prev, routineToRestore]);
+        } else {
+          toast.success("Eliminado correctamente");
+        }
+      } catch (err: any) {
+        console.error("Excepción Eliminando Rutina:", err);
+        toast.error(`Error de conexión al eliminar rutina: ${err.message}`);
+        // Revert
+        setRoutines(prev => [...prev, routineToRestore]);
       }
     }
   };
