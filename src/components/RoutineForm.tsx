@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ChevronLeft, Plus, Save, Youtube, Trash2, GripVertical } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, Plus, Save, Youtube, Trash2, GripVertical, Check, Loader2 } from 'lucide-react';
 import { Routine, Exercise, ExerciseType } from '../types';
 import { useAppContext } from '../store';
 import { v4 as uuidv4 } from 'uuid';
@@ -160,6 +160,38 @@ export function RoutineForm({ routine, onClose }: RoutineFormProps) {
   const [assignedDay, setAssignedDay] = useState(routine?.assignedDay ?? (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1));
   const [exercises, setExercises] = useState<Exercise[]>(routine?.exercises || []);
   const [isDeleteMode, setIsDeleteMode] = useState(false);
+  const [isAutosaving, setIsAutosaving] = useState(false);
+  const [showAutosaveModal, setShowAutosaveModal] = useState(false);
+  const isFirstRender = useRef(true);
+
+  // Auto-save effect
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    // Solo autoguarda si estamos editando una rutina existente
+    if (!routine) return;
+
+    const timer = setTimeout(() => {
+      setIsAutosaving(true);
+      setShowAutosaveModal(true);
+      
+      // Update silencioso para no spammar notificaciones verdes
+      updateRoutine(routine.id, { name, assignedDay, exercises }, true);
+
+      // Simular delay para mejor UX visual
+      setTimeout(() => {
+        setIsAutosaving(false);
+        // Ocultar modal 2 segundos después
+        setTimeout(() => setShowAutosaveModal(false), 2000);
+      }, 600);
+
+    }, 2000); // Esperar 2 segundos después de que el usuario deja de tipear
+
+    return () => clearTimeout(timer);
+  }, [name, assignedDay, exercises, routine]);
 
   const getTypeColorClass = (type: ExerciseType) => {
     switch (type) {
@@ -221,6 +253,32 @@ export function RoutineForm({ routine, onClose }: RoutineFormProps) {
            <Save size={24} />
         </button>
       </header>
+
+      {/* AUTOSAVE MODAL */}
+      <AnimatePresence>
+        {showAutosaveModal && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] bg-[#1C1C24]/90 backdrop-blur-md border border-white/10 px-5 py-2.5 rounded-full shadow-2xl flex items-center gap-3 pointer-events-none"
+          >
+            {isAutosaving ? (
+              <>
+                <Loader2 size={16} className="text-gym-lime animate-spin" />
+                <span className="text-sm font-medium text-white">Autoguardando...</span>
+              </>
+            ) : (
+              <>
+                <div className="w-5 h-5 bg-gym-lime rounded-full flex items-center justify-center text-black">
+                  <Check size={12} strokeWidth={4} />
+                </div>
+                <span className="text-sm font-medium text-white">¡Guardado!</span>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="flex-1 overflow-y-auto hide-scrollbar">
         <div className="p-6 pb-32 space-y-6">

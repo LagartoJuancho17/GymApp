@@ -10,11 +10,21 @@ export function StatsScreen() {
 
   const { exerciseCharts } = useMemo(() => {
     const exerciseLogsMap: Record<string, any[]> = {};
-
     const exerciseTypes: Record<string, string> = {};
+
+    // 1. Pre-fill map with all Fuerza exercises from routines so they always show up as a card
     routines.forEach(r => {
       r.exercises.forEach(ex => {
-        exerciseTypes[ex.name.trim().toLowerCase()] = ex.type;
+        const nameLower = ex.name.trim().toLowerCase();
+        exerciseTypes[nameLower] = ex.type;
+        
+        if (ex.type === 'Fuerza' && ex.name.trim()) {
+          // Check if we already added it (case-insensitive)
+          const existingKey = Object.keys(exerciseLogsMap).find(k => k.toLowerCase() === nameLower);
+          if (!existingKey) {
+            exerciseLogsMap[ex.name.trim()] = [];
+          }
+        }
       });
     });
 
@@ -36,9 +46,12 @@ export function StatsScreen() {
       const dateKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
       const displayDate = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
       
-      const realName = log.exerciseName;
-
-      if (!exerciseLogsMap[realName]) {
+      let realName = log.exerciseName;
+      const existingKey = Object.keys(exerciseLogsMap).find(k => k.toLowerCase() === logName);
+      
+      if (existingKey) {
+        realName = existingKey; // Use the properly capitalized name from routines if it exists
+      } else {
         exerciseLogsMap[realName] = [];
       }
       
@@ -150,27 +163,34 @@ export function StatsScreen() {
               <div key={chart.name} className="snap-center shrink-0 w-[85%] md:w-[280px] bg-neutral-900/50 p-5 rounded-[24px] border border-white/5">
                 <h3 className="text-white font-display font-bold text-sm mb-4 text-center">{chart.name}</h3>
                 <div className="h-48 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chart.data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                      <XAxis dataKey="date" stroke="#888" fontSize={11} tickLine={false} axisLine={false} />
-                      <YAxis stroke="#888" fontSize={11} tickLine={false} axisLine={false} />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#1C1C24', borderRadius: '16px', border: 'none', color: '#fff' }}
-                        itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
-                        formatter={(value: any) => [`${value} kg`, chart.name]}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="weight" 
-                        name={chart.name}
-                        stroke={COLORS[i % COLORS.length]} 
-                        strokeWidth={3} 
-                        dot={{ r: 4, strokeWidth: 2, fill: '#1C1C24' }} 
-                        activeDot={{ r: 6 }} 
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  {chart.data.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chart.data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                        <XAxis dataKey="date" stroke="#888" fontSize={11} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#888" fontSize={11} tickLine={false} axisLine={false} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#1C1C24', borderRadius: '16px', border: 'none', color: '#fff' }}
+                          itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
+                          formatter={(value: any) => [`${value} kg`, chart.name]}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="weight" 
+                          name={chart.name}
+                          stroke={COLORS[i % COLORS.length]} 
+                          strokeWidth={3} 
+                          dot={{ r: 4, strokeWidth: 2, fill: '#1C1C24' }} 
+                          activeDot={{ r: 6 }} 
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-center px-2">
+                      <p className="text-sm text-gray-400 font-bold mb-1">Sin datos</p>
+                      <p className="text-[10px] text-gray-500 font-medium">Registra este ejercicio para ver tu progresión.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

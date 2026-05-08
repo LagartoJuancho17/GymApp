@@ -20,7 +20,7 @@ interface AppState {
   startTrainingGlobal: (routineId: string) => void;
   stopTrainingGlobal: () => void;
   addRoutine: (routine: Omit<Routine, 'id'>) => void;
-  updateRoutine: (id: string, routine: Partial<Routine>) => void;
+  updateRoutine: (id: string, routine: Partial<Routine>, silent?: boolean) => void;
   deleteRoutine: (id: string) => void;
     toggleCompletedExercise: (id: string) => void;
   setGoals: (goals: Goal[]) => void;
@@ -90,6 +90,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  // NUKE EFFECT - Automatic wipe as requested by user
+  useEffect(() => {
+    if (user && !localStorage.getItem('nuke_done_v3')) {
+      const nukeDb = async () => {
+        const db = supabase();
+        if (!db) return;
+        
+        toast.loading("Eliminando toda la basura de la base de datos de forma automática...");
+        
+        // We delete everything we can access
+        const p1 = db.from('exercise_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        const p2 = db.from('completed_workouts').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        const p3 = db.from('routines').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        
+        const results = await Promise.all([p1, p2, p3]);
+        
+        const hasError = results.some(r => r.error);
+        if (hasError) {
+           toast.error("ERROR GRAVE: Supabase bloqueó el borrado. ¡DEBES CORRER EL SQL SCRIPT DE PERMISOS!");
+        } else {
+           localStorage.setItem('nuke_done_v3', 'true');
+           toast.success("¡Base de datos purgada con éxito!");
+           setTimeout(() => window.location.reload(), 1500);
+        }
+      };
+      nukeDb();
+    }
+  }, [user]);
+
   useEffect(() => {
     const fetchSupabaseData = async () => {
       const db = supabase();
@@ -107,7 +136,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (routinesError) {
           console.error("Supabase Error fetch rutinas:", routinesError);
         } else if (dbRoutines && dbRoutines.length > 0) {
-          setRoutines(dbRoutines.map((r: any) => ({
+          const ownedRoutines = dbRoutines.filter((r: any) => r.user_id === user.id);
+          setRoutines(ownedRoutines.map((r: any) => ({
             id: r.id,
             name: r.name,
             assignedDay: r.assigned_day !== undefined ? r.assigned_day : r.assignedDay,
@@ -121,7 +151,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const { data: dbLogs, error: logsError } = await db.from('exercise_logs').select('*');
         if (logsError) console.error("Supabase Error fetch logs:", logsError);
         else if (dbLogs && dbLogs.length > 0) {
-          setExerciseLogs(dbLogs.map((l: any) => ({
+          const ownedLogs = dbLogs.filter((l: any) => l.user_id === user.id);
+          setExerciseLogs(ownedLogs.map((l: any) => ({
             id: l.id,
             date: l.date,
             weight: Number(l.weight),
@@ -139,7 +170,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const { data: dbGoals, error: goalsError } = await db.from('goals').select('*');
         if (goalsError) console.error("Supabase Error fetch goals:", goalsError);
         else if (dbGoals && dbGoals.length > 0) {
-          setGoalsState(dbGoals);
+          setGoalsState(dbGoals.filter((g: any) => g.user_id === user.id));
         } else {
           setGoalsState([]);
         }
@@ -161,7 +192,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const { data: dbWorkouts, error: workoutsError } = await db.from('completed_workouts').select('*');
         if (workoutsError) console.error("Supabase Error fetch completed_workouts:", workoutsError);
         else if (dbWorkouts && dbWorkouts.length > 0) {
-          setCompletedWorkouts(dbWorkouts.map((w: any) => ({
+          const ownedWorkouts = dbWorkouts.filter((w: any) => w.user_id === user.id);
+          setCompletedWorkouts(ownedWorkouts.map((w: any) => ({
             id: w.id,
             routineId: w.routine_id,
             routineName: w.routine_name,
@@ -224,7 +256,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateRoutine = async (id: string, updatedFields: Partial<Routine>) => {
+  const updateRoutine = async (id: string, updatedFields: Partial<Routine>, silent = false) => {
     // Save original in case we need to revert
     const originalRoutine = routines.find(r => r.id === id);
     if (!originalRoutine) return;
@@ -243,11 +275,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const { error } = await db.from('routines').update(payload).eq('id', id);
         if (error) {
           console.error("Supabase Error Actualizando Rutina:", error);
-          toast.error(`Error actualizando rutina en base de datos: ${error.message}`);
+          if (!silent) toast.error(`Error actualizando rutina en base de datos: ${error.message}`);
           // Revert
           setRoutines(prev => prev.map(r => r.id === id ? originalRoutine : r));
         } else {
-          toast.success("Rutina actualizada");
+          if (!silent) toast.success("Rutina actualizada");
         }
       } catch (err: any) {
         console.error("Excepción Actualizando Rutina:", err);
