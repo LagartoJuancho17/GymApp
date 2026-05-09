@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, Play, Dumbbell, Check, Timer } from 'lucide-react';
 import { Routine, Exercise, ExerciseType } from '../types';
 import { useAppContext } from '../store';
@@ -41,6 +41,7 @@ export function RoutineDetailView({ routine, onClose }: RoutineDetailViewProps) 
   } = useAppContext();
   
   const [sessionData, setSessionData] = useState<Record<string, { weight: number, reps: number }>>({});
+  const lastNotifiedRef = useRef<string | null>(null);
 
   // Timers State
   const [isUnlockedForStop, setIsUnlockedForStop] = useState(false);
@@ -90,8 +91,27 @@ export function RoutineDetailView({ routine, onClose }: RoutineDetailViewProps) 
 
       // Send a push notification if they background the app
       if (currentExercise && 'Notification' in window && Notification.permission === 'granted') {
-        // We avoid spamming notifications, only send if it changed. 
-        // We can track the last notified exercise to prevent spam if we want.
+        if (lastNotifiedRef.current !== currentExercise.id) {
+          lastNotifiedRef.current = currentExercise.id;
+          
+          const title = "Actual: " + currentExercise.name;
+          const options = {
+            body: `${currentExercise.sets}x${currentExercise.reps} - ¡A darle!`,
+            icon: '/icon.svg',
+            tag: 'gym-workout', // Group notifications
+            silent: true
+          };
+
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then(registration => {
+              registration.showNotification(title, options);
+            }).catch(() => {
+              new Notification(title, options);
+            });
+          } else {
+            new Notification(title, options);
+          }
+        }
       }
     }
   }, [isThisRoutineActive, completedExercises, routine]);
