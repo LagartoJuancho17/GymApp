@@ -13,31 +13,6 @@ export function ProfileScreen() {
   const [newGoalText, setNewGoalText] = useState('');
   const [newGoalTimeframe, setNewGoalTimeframe] = useState<'Semanal' | 'Mensual'>('Semanal');
 
-  const getRescueSql = () => {
-    if (!user) return "No estás logueado.";
-    return `UPDATE routines SET user_id = '${user.id}';\nUPDATE exercise_logs SET user_id = '${user.id}';\nUPDATE goals SET user_id = '${user.id}';\nUPDATE completed_workouts SET user_id = '${user.id}';`;
-  };
-
-  const handleResetStats = async () => {
-    const confirmed = window.confirm("⚠️ ¿Estás seguro de que quieres RESETEAR todo tu historial de entrenamientos, gráficas y volumen? Esta acción borrará todas las estadísticas y no se puede deshacer.");
-    if (!confirmed) return;
-
-    const db = supabase();
-    if (!db || !user) return;
-
-    try {
-      toast.loading("Reseteando estadísticas...");
-      await db.from('exercise_logs').delete().eq('user_id', user.id);
-      await db.from('completed_workouts').delete().eq('user_id', user.id);
-      toast.success("¡Estadísticas reseteadas con éxito! Por favor, refresca la página (F5).");
-      // Optional: force reload
-      setTimeout(() => window.location.reload(), 1500);
-    } catch (err) {
-      toast.error("Error al resetear.");
-      console.error(err);
-    }
-  };
-
   const openGoalsEditor = () => {
     setGoalsList(goals.map(g => ({ text: g.text, timeframe: g.timeframe })));
     setIsEditingGoals(true);
@@ -83,23 +58,7 @@ export function ProfileScreen() {
         </button>
       </div>
 
-      <div className="mb-6 space-y-3">
-        <button 
-          onClick={handleResetStats}
-          className="w-full bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-2xl flex items-center justify-center gap-2 active:bg-red-500/20 transition-colors font-bold text-sm"
-        >
-          <Trash2 size={20} />
-          RESETEAR MIS ESTADÍSTICAS Y GRÁFICAS
-        </button>
 
-        <button 
-          onClick={() => alert("COPIA ESTE TEXTO Y PÉGALO EN EL SQL EDITOR DE SUPABASE:\n\n" + getRescueSql())}
-          className="w-full bg-neutral-800 border border-white/10 text-gray-400 p-4 rounded-2xl flex items-center justify-center gap-2 active:bg-neutral-700 transition-colors font-bold text-sm"
-        >
-          <Target size={20} />
-          RECUPERAR MIS RUTINAS (SQL)
-        </button>
-      </div>
 
       <div className="grid grid-cols-2 gap-4 mb-8">
         <div className="bg-[#1C1C24] p-5 rounded-3xl border border-white/5 flex flex-col items-center justify-center relative overflow-hidden">
