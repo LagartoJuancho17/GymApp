@@ -2,16 +2,16 @@ import React, { useState } from 'react';
 import { Goal } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { useAppContext } from '../store';
-import { Play, Plus, Trash2, Target } from 'lucide-react';
+import { Play, Plus, Trash2, Target, Flame, Minus } from 'lucide-react';
 
 export function OnboardingScreen() {
   const { setGoals, completeOnboarding } = useAppContext();
+  const [weeklyGoal, setWeeklyGoal] = useState(3);
   const [goalsList, setGoalsList] = useState<Omit<Goal, 'id'>[]>([
-    { text: 'Entrenar 4 días a la semana', timeframe: 'Semanal' },
     { text: 'Llegar a los 100kg en press plano', timeframe: 'Mensual' }
   ]);
   const [newGoalText, setNewGoalText] = useState('');
-  const [newGoalTimeframe, setNewGoalTimeframe] = useState<'Semanal' | 'Mensual'>('Semanal');
+  const [newGoalTimeframe, setNewGoalTimeframe] = useState<'Semanal' | 'Mensual'>('Mensual');
 
   const handleAddGoal = () => {
     if (!newGoalText.trim()) return;
@@ -24,8 +24,15 @@ export function OnboardingScreen() {
   };
 
   const handleFinish = () => {
-    const finalGoals: Goal[] = goalsList.map(g => ({ ...g, id: uuidv4() }));
-    setGoals(finalGoals);
+    // La meta semanal se guarda como un Goal especial con weeklyTrainingGoal
+    const weeklyTrainingGoalObj: Goal = {
+      id: uuidv4(),
+      text: `Entrenar ${weeklyGoal} ${weeklyGoal === 1 ? 'día' : 'días'} a la semana`,
+      timeframe: 'Semanal',
+      weeklyTrainingGoal: weeklyGoal,
+    };
+    const otherGoals: Goal[] = goalsList.map(g => ({ ...g, id: uuidv4() }));
+    setGoals([weeklyTrainingGoalObj, ...otherGoals]);
     completeOnboarding();
   };
 
@@ -36,9 +43,48 @@ export function OnboardingScreen() {
       </div>
       
       <h1 className="text-white font-display font-bold text-3xl mb-2 text-center">Tus Metas</h1>
-      <p className="text-gray-400 text-center mb-8 text-sm max-w-[80%]">Define tus objetivos para mantenerte enfocado. Pueden ser metas semanales o mensuales.</p>
+      <p className="text-gray-400 text-center mb-8 text-sm max-w-[80%]">Define tus objetivos para mantenerte enfocado.</p>
+
+      {/* Selector de entrenamientos semanales */}
+      <div className="w-full bg-[#1C1C24] rounded-[24px] p-5 border border-neutral-700 mb-6 shadow-lg">
+        <div className="flex items-center gap-2 mb-3">
+          <Flame size={18} className="text-orange-400" />
+          <span className="text-white font-bold text-sm">Entrenamientos por semana</span>
+        </div>
+        <p className="text-gray-500 text-xs mb-4">Define cuántos días vas al gym por semana. Esto calcula tu racha 🔥</p>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setWeeklyGoal(Math.max(1, weeklyGoal - 1))}
+            className="w-11 h-11 bg-neutral-800 rounded-full flex items-center justify-center text-white hover:bg-neutral-700 active:scale-90 transition-all"
+          >
+            <Minus size={18} />
+          </button>
+          <div className="flex flex-col items-center">
+            <div className="flex gap-1.5 mb-2">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-sm transition-all ${
+                    i < weeklyGoal ? 'bg-orange-500 text-white shadow-[0_0_8px_rgba(249,115,22,0.6)]' : 'bg-neutral-800 text-gray-600'
+                  }`}
+                >
+                  🔥
+                </div>
+              ))}
+            </div>
+            <span className="text-white font-display font-bold text-2xl">{weeklyGoal} <span className="text-gray-400 text-base font-normal">{weeklyGoal === 1 ? 'día' : 'días'}</span></span>
+          </div>
+          <button
+            onClick={() => setWeeklyGoal(Math.min(7, weeklyGoal + 1))}
+            className="w-11 h-11 bg-neutral-800 rounded-full flex items-center justify-center text-white hover:bg-neutral-700 active:scale-90 transition-all"
+          >
+            <Plus size={18} />
+          </button>
+        </div>
+      </div>
       
       <div className="w-full space-y-4 mb-8">
+        <p className="text-gray-500 text-xs font-medium uppercase tracking-widest">Otras metas</p>
         {goalsList.map((goal, idx) => (
           <div key={idx} className="bg-gym-card rounded-[20px] p-4 flex items-center justify-between border border-neutral-800 shadow-md">
             <div className="flex-1 min-w-0 pr-4">
@@ -57,7 +103,7 @@ export function OnboardingScreen() {
         <div className="bg-neutral-900 rounded-[20px] p-4 border border-neutral-800 flex flex-col gap-3">
           <input 
             type="text" 
-            placeholder="Escribir meta..." 
+            placeholder="Escribir otra meta..." 
             value={newGoalText}
             onChange={(e) => setNewGoalText(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAddGoal()}

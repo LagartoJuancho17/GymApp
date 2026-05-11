@@ -150,6 +150,28 @@ export function Dashboard() {
     return `${month.charAt(0).toUpperCase() + month.slice(1)} ${date.getFullYear()}`;
   }, []);
 
+  // Racha semanal
+  const weeklyTrainingGoal = useMemo(() => {
+    const obj = goals.find(g => g.weeklyTrainingGoal != null);
+    return obj?.weeklyTrainingGoal ?? 3;
+  }, [goals]);
+
+  const workoutsThisWeek = useMemo(() => {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + mondayOffset);
+    monday.setHours(0, 0, 0, 0);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+    return completedWorkouts.filter(w => {
+      const d = new Date(w.date);
+      return d >= monday && d <= sunday;
+    }).length;
+  }, [completedWorkouts]);
+
   if (viewingRoutine) {
     return <RoutineDetailView routine={viewingRoutine} onClose={() => setViewingRoutine(null)} />;
   }
@@ -256,19 +278,55 @@ export function Dashboard() {
           </div>
         )}
 
-        {/* Today's Challenge Card */}
-        <div className="bg-gym-lime rounded-3xl p-6 mb-6 relative overflow-hidden group shadow-lg shadow-gym-lime/10">
-          {/* Background decorative element */}
-          <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/20 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500"></div>
-          
-          <h2 className="text-black font-display font-bold text-lg leading-tight mb-1 relative z-10 w-[70%]">Desafío de hoy</h2>
-          <p className="text-black/80 font-medium text-sm max-w-[65%] leading-snug relative z-10 mt-1">
-            Mantén tu racha viva y completa tu rutina.
-          </p>
-          
-          {/* Simulation of Character/Runner Element */}
-          <div className="absolute top-[50%] -translate-y-1/2 right-4 w-[85px] h-[85px] bg-black/10 rounded-full flex items-center justify-center shadow-inner">
-            <Footprints className="text-black/40 w-10 h-10 -rotate-12" />
+        {/* Streak + Challenge Widget */}
+        <div className="flex gap-3 mb-6">
+          {/* Streak Card */}
+          <div className="flex-1 bg-[#1C1C24] rounded-[24px] p-4 border border-orange-500/15 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-orange-500 rounded-full opacity-[0.08] blur-xl" />
+            <p className="text-gray-500 text-[10px] font-medium uppercase tracking-widest mb-2">Racha</p>
+            <div className="flex items-baseline gap-1 mb-3">
+              <span className="text-white font-display font-bold text-3xl">{workoutsThisWeek}</span>
+              <span className="text-gray-500 text-sm">/ {weeklyTrainingGoal}</span>
+            </div>
+            {/* Flames row */}
+            <div className="flex gap-1 mb-3 flex-wrap">
+              {Array.from({ length: weeklyTrainingGoal }).map((_, i) => (
+                <span
+                  key={i}
+                  className={`text-base transition-all ${
+                    i < workoutsThisWeek
+                      ? 'opacity-100'
+                      : 'opacity-15 grayscale'
+                  }`}
+                >
+                  🔥
+                </span>
+              ))}
+            </div>
+            {/* Progress bar */}
+            <div className="w-full bg-neutral-800 rounded-full h-1.5 overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min(1, workoutsThisWeek / weeklyTrainingGoal) * 100}%` }}
+                transition={{ duration: 0.8, ease: 'easeOut' }}
+                className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-500"
+              />
+            </div>
+            <p className="text-gray-600 text-[10px] mt-2">
+              {workoutsThisWeek >= weeklyTrainingGoal ? '¡Semana completa! 🎉' : `${weeklyTrainingGoal - workoutsThisWeek} restante${weeklyTrainingGoal - workoutsThisWeek === 1 ? '' : 's'}`}
+            </p>
+          </div>
+
+          {/* Challenge Card */}
+          <div className="flex-1 bg-gym-lime rounded-[24px] p-4 relative overflow-hidden group">
+            <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/20 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
+            <h2 className="text-black font-display font-bold text-base leading-tight mb-1 relative z-10">Desafío de hoy</h2>
+            <p className="text-black/70 font-medium text-xs leading-snug relative z-10 mt-1">
+              Mantén tu racha viva.
+            </p>
+            <div className="absolute bottom-3 right-3 w-14 h-14 bg-black/10 rounded-full flex items-center justify-center">
+              <Footprints className="text-black/40 w-7 h-7 -rotate-12" />
+            </div>
           </div>
         </div>
 

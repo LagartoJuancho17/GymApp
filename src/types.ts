@@ -27,6 +27,7 @@ export interface Goal {
   id: string;
   text: string;
   timeframe: 'Semanal' | 'Mensual';
+  weeklyTrainingGoal?: number; // cantidad de entrenamientos semanales objetivo
 }
 
 export interface CompletedWorkout {

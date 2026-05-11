@@ -170,7 +170,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const { data: dbGoals, error: goalsError } = await db.from('goals').select('*');
         if (goalsError) console.error("Supabase Error fetch goals:", goalsError);
         else if (dbGoals && dbGoals.length > 0) {
-          setGoalsState(dbGoals.filter((g: any) => g.user_id === user.id));
+          setGoalsState(dbGoals.filter((g: any) => g.user_id === user.id).map((g: any) => ({
+            id: g.id,
+            text: g.text,
+            timeframe: g.timeframe,
+            weeklyTrainingGoal: g.weekly_training_goal != null ? Number(g.weekly_training_goal) : undefined
+          })));
         } else {
           setGoalsState([]);
         }
@@ -337,7 +342,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await db.from('goals').delete().in('id', goalsToDelete);
       }
       if (newGoals.length > 0) {
-        const { error } = await db.from('goals').upsert(newGoals);
+        // Map camelCase to snake_case for Supabase
+        const payload = newGoals.map(g => ({
+          id: g.id,
+          text: g.text,
+          timeframe: g.timeframe,
+          weekly_training_goal: g.weeklyTrainingGoal ?? null
+        }));
+        const { error } = await db.from('goals').upsert(payload);
         if (error) console.error("Supabase Error guardando Metas:", error);
       }
     }
